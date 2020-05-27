@@ -1,17 +1,17 @@
 package io.quarkus.hibernate.orm;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.*;
 
-import javax.inject.Inject;
-import javax.persistence.EntityManager;
+import javax.inject.*;
+import javax.persistence.*;
 
-import org.jboss.shrinkwrap.api.ShrinkWrap;
-import org.jboss.shrinkwrap.api.spec.JavaArchive;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.RegisterExtension;
+import org.jboss.shrinkwrap.api.*;
+import org.jboss.shrinkwrap.api.spec.*;
+import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.extension.*;
 
-import io.quarkus.hibernate.orm.enhancer.Address;
-import io.quarkus.test.QuarkusUnitTest;
+import io.quarkus.hibernate.orm.enhancer.*;
+import io.quarkus.test.*;
 
 public class HibernateMetadataWithInjectionTest {
 
@@ -29,10 +29,19 @@ public class HibernateMetadataWithInjectionTest {
     EntityManager em;
 
     @Test
-    public void testExpectedEntities() {
+    public void testExpectedEntityNames() {
         assertThat(hibernateMetadata).isNotNull().satisfies(h -> {
             assertThat(h.getDefaultPersistenceUnitMetadata()).hasValueSatisfying(pu -> {
                 assertThat(pu.getEntityClassNames()).containsOnly(Address.class.getName(), MyEntity.class.getName());
+            });
+        });
+    }
+
+    @Test
+    public void testExpectedEnties() {
+        assertThat(hibernateMetadata).isNotNull().satisfies(h -> {
+            assertThat(h.getDefaultPersistenceUnitMetadata()).hasValueSatisfying(pu -> {
+                assertThat(pu.resolveEntityClasses()).containsOnly(Address.class, MyEntity.class);
             });
         });
     }
