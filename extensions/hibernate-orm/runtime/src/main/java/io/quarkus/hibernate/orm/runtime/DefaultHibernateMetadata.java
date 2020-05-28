@@ -1,8 +1,12 @@
 package io.quarkus.hibernate.orm.runtime;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
-import io.quarkus.hibernate.orm.*;
+import io.quarkus.hibernate.orm.HibernateMetadata;
+import io.quarkus.hibernate.orm.PersistenceUnitMetadata;
 
 public class DefaultHibernateMetadata implements HibernateMetadata {
 

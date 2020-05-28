@@ -1,18 +1,19 @@
 package io.quarkus.hibernate.orm.runtime;
 
-import java.util.*;
-import java.util.concurrent.*;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
-import io.quarkus.hibernate.orm.*;
+import io.quarkus.hibernate.orm.PersistenceUnitMetadata;
 
-import static java.util.Collections.*;
-import static java.util.stream.Collectors.*;
+import static java.util.Collections.unmodifiableSet;
 
 public class DefaultPersistenceUnitMetadata implements PersistenceUnitMetadata {
     private final Set<String> classNames;
 
     // poor man's implementation of lazy loading: ConcurrentHashMap with only one entry
-    private final Integer DUMMY_KEY = 0;
+    private static final Integer DUMMY_KEY = 0;
     private final Map<Integer, Set<Class<?>>> resolvedClasses = new ConcurrentHashMap<>();
 
     DefaultPersistenceUnitMetadata(Set<String> classNames) {
@@ -25,26 +26,24 @@ public class DefaultPersistenceUnitMetadata implements PersistenceUnitMetadata {
     }
 
     @Override
-    public Set<Class<?>> resolveEntityClasses(ClassLoader classLoader) {
-        return resolvedClasses.computeIfAbsent(DUMMY_KEY, ignored -> buildPersistenceUnitMetadata(classNames, classLoader));
-    }
-
-    @Override
     public Set<Class<?>> resolveEntityClasses() {
-        return this.resolveEntityClasses(Thread.currentThread().getContextClassLoader());
+        return resolvedClasses.computeIfAbsent(DUMMY_KEY, ignored -> buildPersistenceUnitMetadata(classNames));
     }
 
-    private Set<Class<?>> buildPersistenceUnitMetadata(Set<String> classNames, ClassLoader classLoader) {
-        Set<Class<?>> classes = classNames.stream()
-                .map(className -> classForName(className, classLoader))
-                .collect(toSet());
+    private Set<Class<?>> buildPersistenceUnitMetadata(Set<String> classNames) {
+        Set<Class<?>> classes = new HashSet<>();
+        for (String className : classNames) {
+            classes.add(classForName(className));
+        }
 
         return unmodifiableSet(classes);
     }
 
-    private Class<?> classForName(String className, ClassLoader classLoader) {
+    private Class<?> classForName(String className) {
         try {
-            return classLoader.loadClass(className);
+            // Explicitly do not initialize classes (i.e.: invoke static initializers) here.
+            // => delay this until the application acutally uses/invokes the managed class.
+            return Class.forName(className, false, Thread.currentThread().getContextClassLoader());
         } catch (ClassNotFoundException e) {
             throw new IllegalArgumentException(
                     "Could not load class: " + className + " using current threads ContextClassLoader", e);
