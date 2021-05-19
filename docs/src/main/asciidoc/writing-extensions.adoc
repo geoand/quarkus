@@ -57,7 +57,7 @@ The more is done there, the smaller Quarkus applications using that extension wi
 Quarkus simplifies the most common usages.
 This means that its defaults might be different than the library it integrates.
 
-To make the simple experience easiest, unify the configuration in `application.properties` via MicroProfile Config.
+To make the simple experience easiest, unify the configuration in `application.properties` via SmallRye Config.
 Avoid library specific configuration files, or at least make them optional: e.g. `persistence.xml` for Hibernate ORM is optional.
 
 Extensions should see the configuration holistically as a Quarkus application instead of focusing on the library experience.
@@ -68,6 +68,10 @@ Less common properties can live in the library namespace.
 To fully enable the close world assumptions that Quarkus can optimize best, it is better to consider configuration options as build time settled vs overridable at runtime.
 Of course properties like host, port, password should be overridable at runtime.
 But many properties like enable caching or setting the JDBC driver can safely require a rebuild of the application.
+
+==== Static Init Config
+
+If the extension provides additional Config Sources and if these are required during Static Init, these must be registered with `AdditionalStaticInitConfigSourceProviderBuildItem`. Configuration in Static Init does not scan for additional sources to avoid double initialization at application startup time.
 
 ////
 === API
@@ -963,6 +967,7 @@ and add them to the reflective hierarchy for `BUILD_TIME` analysis.
 
 ----
 
+[[configuration]]
 === Configuration
 
 Configuration in Quarkus is based on SmallRye Config, an implementation of the MicroProfile Config specification.
@@ -1515,7 +1520,7 @@ In order to provide a health check, you should do the following:
 
 - Import the `quarkus-smallrye-health` extension as an **optional** dependency in your runtime module so it will not impact the size of the application if
 health check is not included.
-- Create your health check following the link:microprofile-health[Quarkus - MicroProfile Health] guide. We advise providing only
+- Create your health check following the link:smallrye-health[SmallRye Health] guide. We advise providing only
 readiness check for an extension (liveness check is designed to express the fact that an application is up and needs to be lightweight).
 - Import the `quarkus-smallrye-health-spi` library in your deployment module.
 - Add a build step in your deployment module that produces a `HealthBuildItem`.
@@ -1842,7 +1847,7 @@ import java.util.List;
 import javax.enterprise.inject.Instance;
 import javax.inject.Inject;
 
-import org.eclipse.microprofile.health.Health;
+import org.eclipse.microprofile.health.Liveness;
 import org.eclipse.microprofile.health.HealthCheck;
 import org.eclipse.microprofile.health.HealthCheckResponse;
 import io.quarkus.test.QuarkusUnitTest;
@@ -1865,7 +1870,7 @@ public class FailingUnitTest {
             );
 
     @Inject                                                                             // <3>
-    @Health
+    @Liveness
     Instance<HealthCheck> checks;
 
     @Test

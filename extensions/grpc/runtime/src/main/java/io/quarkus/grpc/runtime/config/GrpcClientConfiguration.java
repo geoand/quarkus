@@ -137,4 +137,16 @@ public class GrpcClientConfiguration {
     @ConfigItem
     public Optional<String> userAgent;
 
+    /**
+     * Use a custom load balancing policy.
+     * Accepted values are: {@code pick_value}, {@code round_robin}, {@code grpclb}
+     */
+    @ConfigItem(defaultValue = "pick_first")
+    public String loadBalancingPolicy;
+
+    /**
+     * The compression to use for each call. The accepted values are {@code gzip} and {@code identity}.
+     */
+    @ConfigItem
+    public Optional<String> compression;
 }

@@ -20,35 +20,29 @@ public class ElasticsearchClientConfigTest {
     @RegisterExtension
     static final QuarkusUnitTest TEST = new QuarkusUnitTest()
             .setArchiveProducer(
-                    () -> ShrinkWrap.create(JavaArchive.class).addClass(TestConfigurator.class)
+                    () -> ShrinkWrap.create(JavaArchive.class).addClasses(TestConfigurator.class, RestClientBuilderHelper.class)
                             .addAsResource(new StringAsset("quarkus.elasticsearch.hosts=elasticsearch:9200"),
                                     "application.properties"));
 
     @Inject
     ElasticsearchConfig config;
-    @Inject
-    @ElasticsearchClientConfig
-    TestConfigurator testConfigurator;
 
     @Test
     public void testRestClientBuilderHelperWithElasticsearchClientConfig() {
         RestClientBuilderHelper.createRestClientBuilder(config).build();
-        assertTrue(testConfigurator.isInvoked());
+        assertTrue(TestConfigurator.invoked);
     }
 
     @ElasticsearchClientConfig
     @ApplicationScoped
     public static class TestConfigurator implements RestClientBuilder.HttpClientConfigCallback {
-        private boolean invoked = false;
+
+        private static boolean invoked = false;
 
         @Override
         public HttpAsyncClientBuilder customizeHttpClient(HttpAsyncClientBuilder builder) {
             invoked = true;
             return builder;
-        }
-
-        public boolean isInvoked() {
-            return invoked;
         }
     }
 

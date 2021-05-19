@@ -15,7 +15,7 @@ To complete this guide, you need:
 
 * less than 30 minutes
 * an IDE
-* JDK 1.8+ installed with `JAVA_HOME` configured appropriately
+* JDK 11+ installed with `JAVA_HOME` configured appropriately
 * Apache Maven {maven-version}
 * Docker Compose to start an Apache Kafka development cluster
 * GraalVM installed if you want to run in native mode.
@@ -287,7 +287,7 @@ public class WeatherStation {
     public String name;
 }
 ----
-<1> By adding the `@RegisterForReflection` annotation, it is ensured that this type can be instantiated reflectively when running the application in native mode.
+<1> The `@RegisterForReflection` annotation instructs Quarkus to keep the class and its members during the native compilation. More details about the `@RegisterForReflection` annotation can be found on  the xref:writing-native-applications-tips.adoc#registerForReflection[native application tips] page.
 
 Then the file `aggregator/src/main/java/org/acme/kafka/streams/aggregator/model/TemperatureMeasurement.java`,
 representing temperature measurements for a given station:
@@ -1252,7 +1252,7 @@ content-length: 265
 This guide has shown how you can build stream processing applications using Quarkus and the Kafka Streams APIs,
 both in JVM and native modes.
 For running your KStreams application in production, you could also add health checks and metrics for the data pipeline.
-Refer to the Quarkus guides on link:micrometer[Micrometer], link:microprofile-metrics[MicroProfile Metrics], and link:microprofile-health[health checks] to learn more.
+Refer to the Quarkus guides on link:micrometer[Micrometer], link:smallrye-metrics[SmallRye Metrics], and link:smallrye-health[SmallRye Health] to learn more.
 
 == Configuration Reference
 

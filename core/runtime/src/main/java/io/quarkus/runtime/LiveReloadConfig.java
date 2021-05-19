@@ -12,12 +12,12 @@ import io.quarkus.runtime.annotations.ConfigRoot;
 public class LiveReloadConfig {
 
     /**
-     * Whether or not Quarkus should disable it's ability to not do a full restart
+     * Whether or not Quarkus should enable its ability to not do a full restart
      * when changes to classes are compatible with JVM instrumentation.
      *
-     * If this is set to false, Quarkus will always restart on changes and never perform class redefinition.
+     * If this is set to true, Quarkus will perform class redefinition when possible.
      */
-    @ConfigItem(defaultValue = "true")
+    @ConfigItem(defaultValue = "false")
     boolean instrumentation;
 
     /**
@@ -44,4 +44,16 @@ public class LiveReloadConfig {
      */
     @ConfigItem(defaultValue = "30s")
     public Duration connectTimeout;
+
+    /**
+     * The amount of time to wait between attempts when connecting to the server side of remote dev
+     */
+    @ConfigItem(defaultValue = "2s")
+    public Duration retryInterval;
+
+    /**
+     * The maximum number of attempts when connecting to the server side of remote dev
+     */
+    @ConfigItem(defaultValue = "10")
+    public Integer retryMaxAttempts;
 }

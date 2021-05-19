@@ -7,15 +7,13 @@ import java.util.Set;
 
 import io.quarkus.cli.core.BaseSubCommand;
 import io.quarkus.cli.core.BuildsystemCommand;
-import io.quarkus.cli.core.QuarkusCliVersion;
 import io.quarkus.devtools.commands.AddExtensions;
 import io.quarkus.devtools.commands.data.QuarkusCommandOutcome;
 import io.quarkus.devtools.project.BuildTool;
 import io.quarkus.devtools.project.QuarkusProject;
-import io.quarkus.devtools.project.QuarkusProjectHelper;
 import picocli.CommandLine;
 
-@CommandLine.Command(name = "add", usageHelpAutoWidth = true, mixinStandardHelpOptions = false, description = "Add extension(s) to current project.")
+@CommandLine.Command(name = "add", mixinStandardHelpOptions = false, description = "Add extension(s) to current project.")
 public class Add extends BaseSubCommand implements BuildsystemCommand {
 
     @CommandLine.Parameters(arity = "1", paramLabel = "EXTENSION", description = "extensions to add to project")
@@ -48,7 +46,7 @@ public class Add extends BaseSubCommand implements BuildsystemCommand {
 
     private Integer addMaven(Path projectDirectory) {
         try {
-            QuarkusProject quarkusProject = QuarkusProjectHelper.getProject(projectDirectory, QuarkusCliVersion.version());
+            final QuarkusProject quarkusProject = QuarkusCliUtils.getQuarkusProject(projectDirectory);
 
             AddExtensions project = new AddExtensions(quarkusProject);
             project.extensions(extensions);

@@ -1,35 +1,38 @@
 package io.quarkus.devtools.project;
 
-import io.quarkus.bootstrap.model.AppArtifactCoords;
+import static io.quarkus.devtools.project.CodestartResourceLoadersBuilder.getCodestartResourceLoaders;
+
 import io.quarkus.bootstrap.resolver.maven.BootstrapMavenException;
 import io.quarkus.bootstrap.resolver.maven.MavenArtifactResolver;
 import io.quarkus.devtools.messagewriter.MessageWriter;
 import io.quarkus.devtools.project.extensions.ExtensionManager;
-import io.quarkus.platform.descriptor.loader.json.ClassPathResourceLoader;
-import io.quarkus.platform.tools.ToolsConstants;
 import io.quarkus.platform.tools.ToolsUtils;
 import io.quarkus.registry.ExtensionCatalogResolver;
 import io.quarkus.registry.RegistryResolutionException;
 import io.quarkus.registry.catalog.ExtensionCatalog;
 import io.quarkus.registry.config.RegistriesConfig;
 import io.quarkus.registry.config.RegistriesConfigLocator;
-import java.net.URL;
-import java.net.URLClassLoader;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import org.eclipse.aether.artifact.Artifact;
-import org.eclipse.aether.artifact.DefaultArtifact;
 
 public class QuarkusProjectHelper {
-
-    private static final String CODESTARTS_ARTIFACTS = "codestarts-artifacts";
 
     private static RegistriesConfig toolsConfig;
     private static MessageWriter log;
     private static MavenArtifactResolver artifactResolver;
     private static ExtensionCatalogResolver catalogResolver;
+
+    private static final boolean registryClientEnabled;
+    static {
+        String value = System.getProperty("quarkusRegistryClient");
+        if (value == null) {
+            value = System.getenv("QUARKUS_REGISTRY_CLIENT");
+        }
+        registryClientEnabled = Boolean.parseBoolean(value);
+    }
+
+    public static boolean isRegistryClientEnabled() {
+        return registryClientEnabled;
+    }
 
     public static QuarkusProject getProject(Path projectDir) {
         BuildTool buildTool = QuarkusProject.resolveExistingProjectBuildTool(projectDir);
@@ -39,6 +42,7 @@ public class QuarkusProjectHelper {
         return getProject(projectDir, buildTool);
     }
 
+    @Deprecated
     public static QuarkusProject getProject(Path projectDir, String quarkusVersion) {
         // TODO remove this method once the default registry becomes available
         BuildTool buildTool = QuarkusProject.resolveExistingProjectBuildTool(projectDir);
@@ -48,15 +52,28 @@ public class QuarkusProjectHelper {
         return getProject(projectDir, buildTool, quarkusVersion);
     }
 
+    @Deprecated
     public static QuarkusProject getProject(Path projectDir, BuildTool buildTool, String quarkusVersion) {
         // TODO remove this method once the default registry becomes available
-        final ExtensionCatalogResolver catalogResolver = getCatalogResolver();
-        if (catalogResolver.hasRegistries()) {
-            return getProject(projectDir, buildTool);
-        }
         return QuarkusProjectHelper.getProject(projectDir,
-                ToolsUtils.resolvePlatformDescriptorDirectly(null, null, quarkusVersion, artifactResolver(), messageWriter()),
+                getExtensionCatalog(quarkusVersion),
                 buildTool);
+    }
+
+    @Deprecated
+    public static ExtensionCatalog getExtensionCatalog(String quarkusVersion) {
+        // TODO remove this method once the default registry becomes available
+        try {
+            if (registryClientEnabled && getCatalogResolver().hasRegistries()) {
+                return quarkusVersion == null ? catalogResolver.resolveExtensionCatalog()
+                        : catalogResolver.resolveExtensionCatalog(quarkusVersion);
+            } else {
+                return ToolsUtils.resolvePlatformDescriptorDirectly(null, null, quarkusVersion, artifactResolver(),
+                        messageWriter());
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to resolve the Quarkus extension catalog", e);
+        }
     }
 
     public static QuarkusProject getProject(Path projectDir, BuildTool buildTool) {
@@ -76,7 +93,7 @@ public class QuarkusProjectHelper {
 
     public static QuarkusProject getProject(Path projectDir, ExtensionCatalog catalog, BuildTool buildTool,
             MessageWriter log) {
-        return QuarkusProject.of(projectDir, catalog, getResourceLoader(catalog, artifactResolver()),
+        return QuarkusProject.of(projectDir, catalog, getCodestartResourceLoaders(catalog),
                 log, buildTool);
     }
 
@@ -90,43 +107,8 @@ public class QuarkusProjectHelper {
 
     public static QuarkusProject getProject(Path projectDir, ExtensionCatalog catalog, ExtensionManager extManager,
             MessageWriter log) {
-        return QuarkusProject.of(projectDir, catalog, getResourceLoader(catalog, artifactResolver()),
+        return QuarkusProject.of(projectDir, catalog, getCodestartResourceLoaders(catalog),
                 log, extManager);
-    }
-
-    public static ClassPathResourceLoader getResourceLoader(ExtensionCatalog catalog) {
-        return getResourceLoader(catalog, artifactResolver());
-    }
-
-    public static ClassPathResourceLoader getResourceLoader(ExtensionCatalog catalog, MavenArtifactResolver mvn) {
-        Object o = catalog.getMetadata().get(CODESTARTS_ARTIFACTS);
-        final List<Artifact> codestartsArtifacts;
-        if (o == null) {
-            // This is hardcoded temporarily
-            codestartsArtifacts = Arrays
-                    .asList(new DefaultArtifact(ToolsConstants.IO_QUARKUS, "quarkus-platform-descriptor-json", "", "jar",
-                            catalog.getQuarkusCoreVersion()));
-        } else {
-            @SuppressWarnings({ "unchecked" })
-            final List<Object> list = o instanceof List ? (List<Object>) o : Arrays.asList(o);
-            codestartsArtifacts = new ArrayList<>(list.size());
-            for (Object i : list) {
-                AppArtifactCoords coords = AppArtifactCoords.fromString(i.toString());
-                codestartsArtifacts.add(new DefaultArtifact(coords.getGroupId(), coords.getArtifactId(), coords.getClassifier(),
-                        coords.getType(), coords.getVersion()));
-            }
-        }
-
-        final URL[] urls = new URL[codestartsArtifacts.size()];
-        for (int i = 0; i < codestartsArtifacts.size(); ++i) {
-            try {
-                urls[i] = mvn.resolve(codestartsArtifacts.get(i)).getArtifact().getFile().toURI().toURL();
-            } catch (Exception e) {
-                throw new RuntimeException("Failed to resolve codestart artifact " + codestartsArtifacts.get(i), e);
-            }
-        }
-
-        return new ClassPathResourceLoader(new URLClassLoader(urls, null));
     }
 
     public static ExtensionCatalogResolver getCatalogResolver() {
@@ -147,7 +129,7 @@ public class QuarkusProjectHelper {
                 .build();
     }
 
-    private static RegistriesConfig toolsConfig() {
+    public static RegistriesConfig toolsConfig() {
         return toolsConfig == null ? toolsConfig = RegistriesConfigLocator.resolveConfig() : toolsConfig;
     }
 

@@ -26,57 +26,20 @@ public class ExecutorRecorder {
     public ExecutorRecorder() {
     }
 
-    /**
-     * In dev mode for now we need the executor to last for the life of the app, as it is used by Undertow. This will likely
-     * change
-     */
-    static volatile CleanableExecutor devModeExecutor;
-
     private static volatile Executor current;
 
     public ExecutorService setupRunTime(ShutdownContext shutdownContext, ThreadPoolConfig threadPoolConfig,
             LaunchMode launchMode) {
-        if (devModeExecutor != null) {
-            current = devModeExecutor;
-            return devModeExecutor;
-        }
         final EnhancedQueueExecutor underlying = createExecutor(threadPoolConfig);
         ExecutorService executor;
         Runnable shutdownTask = createShutdownTask(threadPoolConfig, underlying);
-        if (launchMode == LaunchMode.DEVELOPMENT) {
-            devModeExecutor = new CleanableExecutor(underlying);
-            shutdownContext.addShutdownTask(new Runnable() {
-                @Override
-                public void run() {
-                    devModeExecutor.clean();
-                }
-            });
-            executor = devModeExecutor;
-            Runtime.getRuntime().addShutdownHook(new Thread(shutdownTask, "Executor shutdown thread"));
-        } else {
-            shutdownContext.addLastShutdownTask(shutdownTask);
-            executor = underlying;
-        }
+        shutdownContext.addLastShutdownTask(shutdownTask);
+        executor = underlying;
         if (threadPoolConfig.prefill) {
             underlying.prestartAllCoreThreads();
         }
         current = executor;
         return executor;
-    }
-
-    public static ExecutorService createDevModeExecutorForFailedStart(ThreadPoolConfig config) {
-        EnhancedQueueExecutor underlying = createExecutor(config);
-        Runnable task = createShutdownTask(config, underlying);
-        devModeExecutor = new CleanableExecutor(underlying);
-        Runtime.getRuntime().addShutdownHook(new Thread(task, "Executor shutdown thread"));
-        current = devModeExecutor;
-        return devModeExecutor;
-    }
-
-    static void shutdownDevMode() {
-        if (devModeExecutor != null) {
-            devModeExecutor.shutdown();
-        }
     }
 
     private static Runnable createShutdownTask(ThreadPoolConfig threadPoolConfig, EnhancedQueueExecutor executor) {
@@ -92,9 +55,13 @@ public class ExecutorRecorder {
                 long interruptRemaining = threadPoolConfig.shutdownInterrupt.toNanos();
 
                 long start = System.nanoTime();
-                for (;;)
+                int loop = 1;
+                for (;;) {
+                    // This log can be very useful when debugging problems
+                    log.debugf("loop: %s, remaining: %s, intervalRemaining: %s, interruptRemaining: %s", loop++, remaining,
+                            intervalRemaining, interruptRemaining);
                     try {
-                        if (!executor.awaitTermination(Math.min(remaining, intervalRemaining), TimeUnit.MILLISECONDS)) {
+                        if (!executor.awaitTermination(Math.min(remaining, intervalRemaining), TimeUnit.NANOSECONDS)) {
                             long elapsed = System.nanoTime() - start;
                             intervalRemaining -= elapsed;
                             remaining -= elapsed;
@@ -146,10 +113,12 @@ public class ExecutorRecorder {
                                     break;
                                 }
                             }
+                        } else {
+                            return;
                         }
-                        return;
                     } catch (InterruptedException ignored) {
                     }
+                }
             }
         };
     }

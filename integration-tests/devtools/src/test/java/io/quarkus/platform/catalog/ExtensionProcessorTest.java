@@ -6,7 +6,7 @@ import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 
-import io.quarkus.devtools.PlatformAwareTestBase;
+import io.quarkus.devtools.testing.PlatformAwareTestBase;
 import io.quarkus.platform.catalog.processor.ExtensionProcessor;
 import io.quarkus.registry.catalog.Extension;
 import io.quarkus.registry.catalog.ExtensionCatalog;
@@ -19,12 +19,13 @@ public class ExtensionProcessorTest extends PlatformAwareTestBase {
         final Extension resteasy = findExtension(catalog, "quarkus-resteasy");
         final ExtensionProcessor extensionProcessor = ExtensionProcessor.of(resteasy);
 
-        assertThat(extensionProcessor.getTags()).contains("provides-example");
+        assertThat(extensionProcessor.getTags()).contains("provides-code");
         assertThat(extensionProcessor.getShortName()).contains("jax-rs");
         assertThat(extensionProcessor.getCategories()).contains("web");
-        assertThat(extensionProcessor.getCodestartKind()).isEqualTo(ExtensionProcessor.CodestartKind.EXAMPLE);
+        assertThat(extensionProcessor.getCodestartKind()).isEqualTo(ExtensionProcessor.CodestartKind.EXTENSION_CODESTART);
         assertThat(extensionProcessor.getCodestartName()).isEqualTo("resteasy");
-        assertThat(extensionProcessor.getCodestartArtifact()).isEqualTo("io.quarkus:quarkus-descriptor-json");
+        assertThat(extensionProcessor.getCodestartArtifact())
+                .isEqualTo("io.quarkus:quarkus-project-core-extension-codestarts::jar:" + getQuarkusCoreVersion());
         assertThat(extensionProcessor.getCodestartLanguages()).contains("java", "kotlin", "scala");
         assertThat(extensionProcessor.getKeywords()).contains("resteasy", "jaxrs", "web", "rest");
         assertThat(extensionProcessor.getExtendedKeywords()).contains("resteasy", "jaxrs", "web", "rest");
@@ -42,7 +43,8 @@ public class ExtensionProcessorTest extends PlatformAwareTestBase {
         assertThat(extensionProcessor.getCodestartKind()).isEqualTo(ExtensionProcessor.CodestartKind.CORE);
         assertThat(extensionProcessor.getCodestartName()).isEqualTo("kotlin");
         assertThat(extensionProcessor.getCodestartLanguages()).isEmpty();
-        assertThat(extensionProcessor.getCodestartArtifact()).isEqualTo("io.quarkus:quarkus-descriptor-json");
+        assertThat(extensionProcessor.getCodestartArtifact())
+                .isEqualTo("io.quarkus:quarkus-project-core-extension-codestarts::jar:" + getQuarkusCoreVersion());
         assertThat(extensionProcessor.getKeywords()).contains("kotlin");
         assertThat(extensionProcessor.getExtendedKeywords()).contains("kotlin", "quarkus-kotlin", "services", "write");
         assertThat(extensionProcessor.getGuide()).isEqualTo("https://quarkus.io/guides/kotlin");

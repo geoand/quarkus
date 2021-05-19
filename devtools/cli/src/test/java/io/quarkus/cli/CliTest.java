@@ -6,17 +6,21 @@ import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.Comparator;
+import java.util.List;
 
+import org.apache.commons.lang3.StringUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import io.quarkus.cli.core.ExecuteUtil;
-import io.quarkus.devtools.test.RegistryClientTestHelper;
+import io.quarkus.devtools.testing.RegistryClientTestHelper;
 import picocli.CommandLine;
 
 public class CliTest {
@@ -154,6 +158,7 @@ public class CliTest {
     }
 
     @Test
+    @Tag("failsOnJDK16")
     public void testGradleAddListRemove() throws Exception {
         // Gradle list command cannot be screen captured with the current implementation
         // so I will just test good return values
@@ -262,6 +267,25 @@ public class CliTest {
     }
 
     @Test
+    public void testCreateWithAppConfig() throws Exception {
+        Path project = workspace.resolve("code-with-quarkus");
+
+        List<String> configs = Arrays.asList("custom.app.config1=val1",
+                "custom.app.config2=val2", "lib.config=val3");
+
+        execute("create", "--app-config=" + StringUtils.join(configs, ","));
+
+        Assertions.assertEquals(CommandLine.ExitCode.OK, exitCode);
+        Assertions.assertTrue(screen.contains("Project code-with-quarkus created"));
+
+        Assertions.assertTrue(project.resolve("src/main/resources/application.properties").toFile().exists());
+        String propertiesFile = readString(project.resolve("src/main/resources/application.properties"));
+
+        configs.forEach(conf -> Assertions.assertTrue(propertiesFile.contains(conf)));
+    }
+
+    @Test
+    @Tag("failsOnJDK16")
     public void testCreateGradleDefaults() throws Exception {
         Path project = workspace.resolve("code-with-quarkus");
 
@@ -281,6 +305,7 @@ public class CliTest {
     }
 
     @Test
+    @Tag("failsOnJDK16")
     public void testGradleBuild() throws Exception {
 
         execute("create", "--gradle", "resteasy");

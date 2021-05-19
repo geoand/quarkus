@@ -29,12 +29,12 @@ public class KafkaBindingConverter implements ServiceBindingConverter {
             properties.put("kafka.bootstrap.servers", bootstrapServers);
         }
 
-        String securityProtocol = binding.getProperties().get("securityprotocol");
+        String securityProtocol = binding.getProperties().get("securityProtocol");
         if (securityProtocol != null) {
             properties.put("kafka.security.protocol", securityProtocol);
         }
 
-        String saslMechanism = binding.getProperties().get("saslmechanism");
+        String saslMechanism = binding.getProperties().get("saslMechanism");
         if (saslMechanism != null) {
             properties.put("kafka.sasl.mechanism", saslMechanism);
         }
@@ -42,7 +42,9 @@ public class KafkaBindingConverter implements ServiceBindingConverter {
         String password = binding.getProperties().get("password");
         if ("PLAIN".equals(saslMechanism) && (user != null) && (password != null)) {
             properties.put("kafka.sasl.jaas.config",
-                    String.format("org.apache.kafka.common.security.plain.PlainLoginModule required %s %s", user, password));
+                    String.format(
+                            "org.apache.kafka.common.security.plain.PlainLoginModule required username='%s' password='%s';",
+                            user, password));
         }
 
         return Optional.of(new ServiceBindingConfigSource("kafka-k8s-service-binding-source", properties));

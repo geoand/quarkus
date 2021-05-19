@@ -7,7 +7,7 @@ https://github.com/quarkusio/quarkus/tree/main/docs/src/main/asciidoc
 
 include::./attributes.adoc[]
 
-This guide explains how to use the MicroProfile REST Client in order to interact with REST APIs
+This guide explains how to use the RESTEasy REST Client in order to interact with REST APIs
 with very little effort.
 
 TIP: there is another guide if you need to write server link:rest-json[JSON REST APIs].
@@ -18,7 +18,7 @@ To complete this guide, you need:
 
 * less than 15 minutes
 * an IDE
-* JDK 1.8+ installed with `JAVA_HOME` configured appropriately
+* JDK 11+ installed with `JAVA_HOME` configured appropriately
 * Apache Maven {maven-version}
 
 == Solution
@@ -108,7 +108,7 @@ but it suffices for the purposes of this guide.
 
 == Create the interface
 
-Using the MicroProfile REST Client is as simple as creating an interface using the proper JAX-RS and MicroProfile annotations. In our case the interface should be created at `src/main/java/org/acme/rest/client/CountriesService.java` and have the following content:
+Using the RESTEasy REST Client is as simple as creating an interface using the proper JAX-RS and MicroProfile annotations. In our case the interface should be created at `src/main/java/org/acme/rest/client/CountriesService.java` and have the following content:
 
 [source, java]
 ----
@@ -220,7 +220,6 @@ country-api/mp-rest/url=https://restcountries.eu/rest #
 country-api/mp-rest/scope=javax.inject.Singleton # /
 ----
 
-
 === Disabling Hostname Verification
 
 To disable the SSL hostname verification for a specific REST client, add the following property to your configuration:
@@ -229,6 +228,19 @@ To disable the SSL hostname verification for a specific REST client, add the fol
 ----
 country-api/mp-rest/hostnameVerifier=io.quarkus.restclient.NoopHostnameVerifier
 ----
+
+=== Disabling SSL verifications
+
+To disable all SSL verifications, add the following property to your configuration:
+
+[source,properties]
+----
+quarkus.tls.trust-all=true
+----
+[WARNING]
+====
+This setting should not be used in production as it will disable any kind of SSL verification.
+====
 
 == Update the JAX-RS resource
 
@@ -464,7 +476,7 @@ The previous snippet uses Mutiny reactive types, if you're not familiar with the
 ====
 
 When returning a `Uni`, every _subscription_ invokes the remote service.
-It means you can re-send the request by re-subscribing on the `Uni`, or use a `retry` as follow:
+It means you can re-send the request by re-subscribing on the `Uni`, or use a `retry` as follows:
 
 [source, java]
 ----
@@ -542,7 +554,36 @@ public class RequestUUIDHeaderFactory implements ClientHeadersFactory {
 }
 ----
 
-Any CDI bean matching the declared factory class will be picked up and can of course benefit from the usual CDI infrastructure.
+As you see in the example above, you can make your the `ClientHeadersFactory` implementation a CDI bean by
+annotating it with a scope-defining annotation, such as `@Singleton`, `@ApplicationScoped`, etc.
+
+
+=== Default header factory
+You can also use `@RegisterClientHeaders` annotation without any custom factory specified. In that case the `DefaultClientHeadersFactoryImpl` factory will be used and all headers listed in `org.eclipse.microprofile.rest.client.propagateHeaders` configuration property will be amended. Individual header names are comma-separated.
+[source, java]
+----
+
+@Path("/v2")
+@RegisterRestClient
+@RegisterClientHeaders
+public interface CountriesService {
+
+    @GET
+    @Path("/name/{name}")
+    @Produces("application/json")
+    Set<Country> getByName(@PathParam String name);
+
+    @GET
+    @Path("/name/{name}")
+    @Produces("application/json")
+    CompletionStage<Set<Country>> getByNameAsync(@PathParam String name);
+}
+----
+
+[source,properties]
+----
+org.eclipse.microprofile.rest.client.propagateHeaders=Authorization,Proxy-Authorization
+----
 
 == Package and run the application
 
@@ -567,6 +608,7 @@ However, you can change this default behavior and constrain a provider to:
 * only consider *client* calls by adding the `@ConstrainedTo(RuntimeType.CLIENT)` annotation to your provider;
 * only consider *server* calls by adding the `@ConstrainedTo(RuntimeType.SERVER)` annotation to your provider.
 
+[#using-a-mock-http-server-for-tests]
 == Using a Mock HTTP Server for tests
 
 Setting up a mock HTTP server, against which tests are run, is a common testing pattern.
@@ -631,7 +673,7 @@ public class WiremockCountries implements QuarkusTestResourceLifecycleManager { 
 
 		stubFor(get(urlMatching(".*")).atPriority(10).willReturn(aResponse().proxiedFrom("https://restcountries.eu/rest")));   // <5>
 
-		return Collections.singletonMap("org.acme.getting.started.country.CountriesService/mp-rest/url", wireMockServer.baseUrl()); // <6>
+		return Collections.singletonMap("org.acme.rest.client.CountriesService/mp-rest/url", wireMockServer.baseUrl()); // <6>
 	}
 
 	@Override
@@ -671,4 +713,4 @@ public class CountriesResourceTest {
 
 == Further reading
 
- * link:https://download.eclipse.org/microprofile/microprofile-rest-client-1.2.1/microprofile-rest-client-1.2.1.html[MicroProfile Rest Client specification]
+ * link:https://download.eclipse.org/microprofile/microprofile-rest-client-2.0/microprofile-rest-client-spec-2.0.html[MicroProfile Rest Client specification]

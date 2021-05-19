@@ -1,0 +1,11 @@
+name: jbang-picocli-code
+ref: picocli
+type: code
+language:
+  base:
+    data:
+      command:
+        class-name: GreetingCommand
+        name: Greeting
+    dependencies:
+      - io.quarkus:quarkus-picocli

@@ -6,6 +6,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -27,6 +28,28 @@ class BuildIT extends MojoTestBase {
 
     private RunningInvoker running;
     private File testDir;
+
+    @Test
+    void testConditionalDependencies()
+            throws MavenInvocationException, IOException, InterruptedException {
+        testDir = initProject("projects/conditional-dependencies", "projects/conditional-dependencies-build");
+
+        running = new RunningInvoker(testDir, false);
+        MavenProcessInvocationResult result = running.execute(Collections.singletonList("package"),
+                Collections.emptyMap());
+        assertThat(result.getProcess().waitFor()).isZero();
+
+        final File targetDir = new File(testDir, "runner" + File.separator + "target");
+        final File runnerJar = targetDir.toPath().resolve("quarkus-app").resolve("quarkus-run.jar").toFile();
+        // make sure the jar can be read by JarInputStream
+        ensureManifestOfJarIsReadableByJarInputStream(runnerJar);
+
+        final Path mainLib = targetDir.toPath().resolve("quarkus-app").resolve("lib").resolve("main");
+        assertThat(mainLib.resolve("org.acme.acme-quarkus-ext-a-1.0-SNAPSHOT.jar")).exists();
+        assertThat(mainLib.resolve("org.acme.acme-quarkus-ext-b-1.0-SNAPSHOT.jar")).exists();
+        assertThat(mainLib.resolve("org.acme.acme-quarkus-ext-c-1.0-SNAPSHOT.jar")).exists();
+        assertThat(mainLib.resolve("org.acme.acme-quarkus-ext-d-1.0-SNAPSHOT.jar")).doesNotExist();
+    }
 
     @Test
     void testMultiModuleAppRootWithNoSources()
@@ -52,7 +75,7 @@ class BuildIT extends MojoTestBase {
     @Test
     void testModuleWithBuildProfileInProperty() throws MavenInvocationException, InterruptedException, IOException {
         testDir = initProject("projects/build-mode-quarkus-profile-property");
-        build(null);
+        build();
         launch();
     }
 
@@ -63,26 +86,58 @@ class BuildIT extends MojoTestBase {
         launch();
     }
 
+    @Test
+    void testMultiBuildMode() throws MavenInvocationException, InterruptedException, IOException {
+        testDir = initProject("projects/multi-build-mode");
+        build();
+
+        for (TestContext context : TestContext.values()) {
+            if (context == TestContext.FAST_NO_PREFIX) {
+                continue;
+            }
+            launch(context, "foo-", "Foo: hello, from foo-?/MultiSet");
+            launch(context, "bar-", "Bar: hello, from bar-FileUtils/?");
+            launch(context, "foo-full-", "Foo: hello, from foo-FileUtils/MultiSet");
+            launch(context, "bar-empty-", "Bar: hello, from bar-?/?");
+        }
+    }
+
+    @Test
+    public void testModulesInProfiles()
+            throws MavenInvocationException, IOException, InterruptedException {
+        testDir = initProject("projects/modules-in-profiles");
+        build("-Dquarkus.bootstrap.effective-model-builder");
+    }
+
     private void launch() throws IOException {
-        File output = new File(testDir, "target/output.log");
+        launch(TestContext.FAST_NO_PREFIX, "", "hello, from foo");
+    }
+
+    private void launch(TestContext context, String outputPrefix, String expectedMessage) throws IOException {
+        File output = new File(testDir, String.format("target/%s%soutput.log", context.prefix, outputPrefix));
         output.createNewFile();
-        Process process = JarRunnerIT.doLaunch(new File(testDir, "target/quarkus-app"), Paths.get("quarkus-run.jar"), output,
-                Collections.emptyList()).start();
+        Process process = JarRunnerIT
+                .doLaunch(new File(testDir, String.format("target/%s%squarkus-app", context.prefix, outputPrefix)),
+                        Paths.get(context.jarFileName), output,
+                        Collections.emptyList())
+                .start();
         try {
-            Assertions.assertEquals("hello, from foo", DevModeTestUtils.getHttpResponse("/hello"));
+            Assertions.assertEquals(expectedMessage, DevModeTestUtils.getHttpResponse("/hello"));
         } finally {
             process.destroy();
         }
     }
 
-    private void build(String arg) throws MavenInvocationException, InterruptedException, IOException {
+    private void build(String... arg) throws MavenInvocationException, InterruptedException, IOException {
         assertThat(testDir).isDirectory();
         running = new RunningInvoker(testDir, false);
 
         final List<String> args = new ArrayList<>(2);
         args.add("package");
-        if (arg != null) {
-            args.add(arg);
+        if (arg.length > 0) {
+            for (String a : arg) {
+                args.add(a);
+            }
         }
         MavenProcessInvocationResult result = running.execute(args, Collections.emptyMap());
         assertThat(result.getProcess().waitFor()).isZero();
@@ -94,6 +149,21 @@ class BuildIT extends MojoTestBase {
                 Manifest manifest = stream.getManifest();
                 assertThat(manifest).isNotNull();
             }
+        }
+    }
+
+    enum TestContext {
+        FAST_NO_PREFIX("", "quarkus-run.jar"),
+        FAST("fast-", "quarkus-run.jar"),
+        LEGACY("legacy-", "legacy-runner.jar"),
+        UBER("uber-", "uber-runner.jar");
+
+        final String prefix;
+        final String jarFileName;
+
+        TestContext(String prefix, String jarFileName) {
+            this.prefix = prefix;
+            this.jarFileName = jarFileName;
         }
     }
 }

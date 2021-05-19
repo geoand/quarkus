@@ -4,13 +4,18 @@ import static io.quarkus.test.common.PathTestHelper.getAppClassLocationForTestLo
 import static io.quarkus.test.common.PathTestHelper.getTestClassesLocation;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.lang.reflect.Field;
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.CodeSource;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
@@ -26,7 +31,7 @@ import io.quarkus.bootstrap.BootstrapConstants;
 import io.quarkus.bootstrap.app.CuratedApplication;
 import io.quarkus.bootstrap.app.QuarkusBootstrap;
 import io.quarkus.bootstrap.model.PathsCollection;
-import io.quarkus.bootstrap.resolver.model.QuarkusModel;
+import io.quarkus.bootstrap.model.gradle.QuarkusModel;
 import io.quarkus.bootstrap.utils.BuildToolHelper;
 import io.quarkus.datasource.deployment.spi.DevServicesDatasourceResultBuildItem;
 import io.quarkus.runtime.configuration.ProfileManager;
@@ -176,7 +181,7 @@ final class IntegrationTestUtil {
         }
 
         // If gradle project running directly with IDE
-        if (System.getProperty(BootstrapConstants.SERIALIZED_APP_MODEL) == null) {
+        if (System.getProperty(BootstrapConstants.SERIALIZED_TEST_APP_MODEL) == null) {
             QuarkusModel model = BuildToolHelper.enableGradleAppModelForTest(projectRoot);
             if (model != null) {
                 final Set<File> classDirectories = model.getWorkspace().getMainModule().getSourceSet()
@@ -210,12 +215,81 @@ final class IntegrationTestUtil {
         Map<String, String> propertyMap = new HashMap<>();
         curatedApplication
                 .createAugmentor()
-                .performCustomBuild(NativeDevServicesDatasourceHandler.class.getName(), new BiConsumer<String, String>() {
+                .performCustomBuild(NativeDevServicesHandler.class.getName(), new BiConsumer<String, String>() {
                     @Override
                     public void accept(String s, String s2) {
                         propertyMap.put(s, s2);
                     }
                 }, DevServicesDatasourceResultBuildItem.class.getName());
         return propertyMap;
+    }
+
+    static Properties readQuarkusArtifactProperties(ExtensionContext context) {
+        Path buildOutputDirectory = determineBuildOutputDirectory(context);
+        Path artifactProperties = buildOutputDirectory.resolve("quarkus-artifact.properties");
+        if (!Files.exists(artifactProperties)) {
+            throw new IllegalStateException(
+                    "Unable to locate the artifact metadata file created that must be created by Quarkus in order to run integration tests.");
+        }
+        try {
+            Properties properties = new Properties();
+            properties.load(new FileInputStream(artifactProperties.toFile()));
+            return properties;
+        } catch (IOException e) {
+            throw new UncheckedIOException(
+                    "Unable to read artifact metadata file created that must be created by Quarkus in order to run integration tests.",
+                    e);
+        }
+    }
+
+    static Path determineBuildOutputDirectory(ExtensionContext context) {
+        String buildOutputDirStr = System.getProperty("build.output.directory");
+        Path result = null;
+        if (buildOutputDirStr != null) {
+            result = Paths.get(buildOutputDirStr);
+        } else {
+            // we need to guess where the artifact properties file is based on the location of the test class
+            Class<?> testClass = context.getRequiredTestClass();
+            final CodeSource codeSource = testClass.getProtectionDomain().getCodeSource();
+            if (codeSource != null) {
+                URL codeSourceLocation = codeSource.getLocation();
+                File artifactPropertiesDirectory = determineBuildOutputDirectory(codeSourceLocation);
+                if (artifactPropertiesDirectory == null) {
+                    throw new IllegalStateException(
+                            "Unable to determine the output of the Quarkus build. Consider setting the 'build.output.directory' system property.");
+                }
+                result = artifactPropertiesDirectory.toPath();
+            }
+        }
+        if (result == null) {
+            throw new IllegalStateException(
+                    "Unable to locate the artifact metadata file created that must be created by Quarkus in order to run tests annotated with '@QuarkusIntegrationTest'.");
+        }
+        if (!Files.isDirectory(result)) {
+            throw new IllegalStateException(
+                    "The determined Quarkus build output '" + result.toAbsolutePath().toString() + "' is not a directory");
+        }
+        return result;
+    }
+
+    private static File determineBuildOutputDirectory(final URL url) {
+        if (url == null) {
+            return null;
+        }
+        if (url.getProtocol().equals("file") && url.getPath().endsWith("test-classes/")) {
+            //we have the maven test classes dir
+            File testClasses = new File(url.getPath());
+            return testClasses.getParentFile();
+        } else if (url.getProtocol().equals("file") && url.getPath().endsWith("test/")) {
+            //we have the gradle test classes dir, build/classes/java/test
+            File testClasses = new File(url.getPath());
+            return testClasses.getParentFile().getParentFile().getParentFile();
+        } else if (url.getProtocol().equals("file") && url.getPath().contains("/target/surefire/")) {
+            //this will make mvn failsafe:integration-test work
+            String path = url.getPath();
+            int index = path.lastIndexOf("/target/");
+            return new File(path.substring(0, index) + "/target/");
+        }
+        return null;
     }
 }

@@ -25,6 +25,8 @@ import org.gradle.api.artifacts.ResolvedArtifact;
 import org.gradle.api.artifacts.ResolvedDependency;
 import org.gradle.api.plugins.JavaPlugin;
 import org.gradle.api.plugins.JavaPluginConvention;
+import org.gradle.api.plugins.JavaPluginExtension;
+import org.gradle.api.provider.Provider;
 import org.gradle.api.tasks.Input;
 import org.gradle.api.tasks.InputDirectory;
 import org.gradle.api.tasks.Optional;
@@ -33,6 +35,10 @@ import org.gradle.api.tasks.SourceSetContainer;
 import org.gradle.api.tasks.TaskAction;
 import org.gradle.api.tasks.compile.JavaCompile;
 import org.gradle.api.tasks.options.Option;
+import org.gradle.jvm.toolchain.JavaLauncher;
+import org.gradle.jvm.toolchain.JavaToolchainService;
+import org.gradle.jvm.toolchain.JavaToolchainSpec;
+import org.gradle.util.GradleVersion;
 
 import io.quarkus.bootstrap.BootstrapConstants;
 import io.quarkus.bootstrap.model.AppArtifact;
@@ -192,14 +198,26 @@ public class QuarkusDev extends QuarkusTask {
 
     private QuarkusDevModeLauncher newLauncher() throws Exception {
         final Project project = getProject();
-        GradleDevModeLauncher.Builder builder = GradleDevModeLauncher.builder(getLogger())
+
+        String java = null;
+
+        if (GradleVersion.current().compareTo(GradleVersion.version("6.7")) >= 0) {
+            JavaToolchainService toolChainService = project.getExtensions().getByType(JavaToolchainService.class);
+            JavaToolchainSpec toolchainSpec = project.getExtensions().getByType(JavaPluginExtension.class).getToolchain();
+            Provider<JavaLauncher> javaLauncher = toolChainService.launcherFor(toolchainSpec);
+            if (javaLauncher.isPresent()) {
+                java = javaLauncher.get().getExecutablePath().getAsFile().getAbsolutePath();
+            }
+        }
+        GradleDevModeLauncher.Builder builder = GradleDevModeLauncher.builder(getLogger(), java)
                 .preventnoverify(isPreventnoverify())
                 .projectDir(project.getProjectDir())
                 .buildDir(getBuildDir())
                 .outputDir(getBuildDir())
                 .debug(System.getProperty("debug"))
                 .debugHost(System.getProperty("debugHost", "localhost"))
-                .suspend(System.getProperty("suspend"));
+                .suspend(System.getProperty("suspend"))
+                .jvmArgs("-Dquarkus.test.basic-console=true"); //TODO: figure out how to fix the console
 
         if (getJvmArgs() != null) {
             builder.jvmArgs(getJvmArgs());
@@ -236,11 +254,21 @@ public class QuarkusDev extends QuarkusTask {
 
         for (AppDependency appDependency : appModel.getFullDeploymentDeps()) {
             final AppArtifact appArtifact = appDependency.getArtifact();
+            //we only use the launcher for launching from the IDE, we need to exclude it
+            if (appArtifact.getGroupId().equals("io.quarkus") && appArtifact.getGroupId().equals("quarkus-ide-launcher")) {
+                continue;
+            }
             if (!projectDependencies.contains(new AppArtifactKey(appArtifact.getGroupId(), appArtifact.getArtifactId()))) {
                 appArtifact.getPaths().forEach(p -> {
                     if (Files.exists(p)) {
-                        addToClassPaths(builder, p.toFile());
+                        if (appArtifact.getGroupId().equals("io.quarkus")
+                                && appArtifact.getArtifactId().equals("quarkus-class-change-agent")) {
+                            builder.jvmArgs("-javaagent:" + p.toFile().getAbsolutePath());
+                        } else {
+                            addToClassPaths(builder, p.toFile());
+                        }
                     }
+
                 });
             }
         }
@@ -266,10 +294,26 @@ public class QuarkusDev extends QuarkusTask {
 
         modifyDevModeContext(builder);
 
-        final Path serializedModel = QuarkusGradleUtils.serializeAppModel(appModel, this);
+        final Path serializedModel = QuarkusGradleUtils.serializeAppModel(appModel, this, false);
         serializedModel.toFile().deleteOnExit();
         builder.jvmArgs("-D" + BootstrapConstants.SERIALIZED_APP_MODEL + "=" + serializedModel.toAbsolutePath());
 
+        if (builder.isTestsPresent()) {
+            final AppModel testAppModel;
+            final AppModelResolver testModelResolver = extension().getAppModelResolver(LaunchMode.TEST);
+            try {
+                final AppArtifact appArtifact = extension().getAppArtifact();
+                appArtifact.setPaths(QuarkusGradleUtils.getOutputPaths(project));
+                testAppModel = testModelResolver.resolveModel(appArtifact);
+            } catch (AppModelResolverException e) {
+                throw new GradleException(
+                        "Failed to resolve application model " + extension().getAppArtifact() + " dependencies",
+                        e);
+            }
+            final Path serializedTestModel = QuarkusGradleUtils.serializeAppModel(testAppModel, this, true);
+            serializedTestModel.toFile().deleteOnExit();
+            builder.jvmArgs("-D" + BootstrapConstants.SERIALIZED_TEST_APP_MODEL + "=" + serializedTestModel.toAbsolutePath());
+        }
         extension().outputDirectory().mkdirs();
 
         if (!args.isEmpty()) {
@@ -334,7 +378,15 @@ public class QuarkusDev extends QuarkusTask {
             return;
         }
 
-        String classesDir = QuarkusGradleUtils.getClassesDir(mainSourceSet, project.getBuildDir());
+        String classesDir = QuarkusGradleUtils.getClassesDir(mainSourceSet, project.getBuildDir(), false);
+        if (classesDir == null) {
+            return;
+        } else {
+            File classesDirFile = new File(classesDir);
+            if (!classesDirFile.exists()) {
+                return;
+            }
+        }
 
         final String resourcesOutputPath;
         if (resourcesOutputDir.exists()) {
@@ -348,16 +400,60 @@ public class QuarkusDev extends QuarkusTask {
             resourcesOutputPath = classesDir;
         }
 
-        DevModeContext.ModuleInfo wsModuleInfo = new DevModeContext.ModuleInfo(key,
-                project.getName(),
-                project.getProjectDir().getAbsolutePath(),
-                sourcePaths,
-                classesDir,
-                resourcesSrcDir.getAbsolutePath(),
-                resourcesOutputPath,
-                sourceParentPaths,
-                project.getBuildDir().toPath().resolve("generated-sources").toAbsolutePath().toString(),
-                project.getBuildDir().toString());
+        DevModeContext.ModuleInfo.Builder moduleBuilder = new DevModeContext.ModuleInfo.Builder().setAppArtifactKey(key)
+                .setName(project.getName())
+                .setProjectDirectory(project.getProjectDir().getAbsolutePath())
+                .setSourcePaths(sourcePaths)
+                .setClassesPath(classesDir)
+                .setResourcePath(resourcesSrcDir.getAbsolutePath())
+                .setResourcesOutputPath(resourcesOutputPath)
+                .setSourceParents(sourceParentPaths)
+                .setPreBuildOutputDir(project.getBuildDir().toPath().resolve("generated-sources").toAbsolutePath().toString())
+                .setTargetDir(project.getBuildDir().toString());
+
+        SourceSet testSourceSet = sourceSets.findByName(SourceSet.TEST_SOURCE_SET_NAME);
+        if (testSourceSet != null) {
+
+            Set<String> testSourcePaths = new HashSet<>();
+            Set<String> testSourceParentPaths = new HashSet<>();
+
+            for (File sourceDir : testSourceSet.getAllJava().getSrcDirs()) {
+                if (sourceDir.exists()) {
+                    testSourcePaths.add(sourceDir.getAbsolutePath());
+                    testSourceParentPaths.add(sourceDir.toPath().getParent().toAbsolutePath().toString());
+                }
+            }
+            //TODO: multiple resource directories
+            final File testResourcesSrcDir = testSourceSet.getResources().getSourceDirectories().getSingleFile();
+            // resourcesSrcDir may exist but if it's empty the resources output dir won't be created
+            final File testResourcesOutputDir = testSourceSet.getOutput().getResourcesDir();
+
+            if (!testSourcePaths.isEmpty() || (testResourcesOutputDir != null && testResourcesOutputDir.exists())) {
+                String testClassesDir = QuarkusGradleUtils.getClassesDir(testSourceSet, project.getBuildDir(), true);
+                if (testClassesDir != null) {
+                    File testClassesDirFile = new File(testClassesDir);
+                    if (testClassesDirFile.exists()) {
+                        final String testResourcesOutputPath;
+                        if (testResourcesOutputDir.exists()) {
+                            testResourcesOutputPath = testResourcesOutputDir.getAbsolutePath();
+                            if (!Files.exists(Paths.get(testClassesDir))) {
+                                // currently classesDir can't be null and is expected to exist
+                                testClassesDir = testResourcesOutputPath;
+                            }
+                        } else {
+                            // currently resources dir should exist
+                            testResourcesOutputPath = testClassesDir;
+                        }
+                        moduleBuilder.setTestSourcePaths(testSourcePaths)
+                                .setTestClassesPath(testClassesDir)
+                                .setTestResourcePath(testResourcesSrcDir.getAbsolutePath())
+                                .setTestResourcesOutputPath(testResourcesOutputPath);
+                    }
+                }
+            }
+        }
+        DevModeContext.ModuleInfo wsModuleInfo = moduleBuilder
+                .build();
 
         if (root) {
             builder.mainModule(wsModuleInfo);

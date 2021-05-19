@@ -1,5 +1,6 @@
 package io.quarkus.devtools.commands;
 
+import static io.quarkus.devtools.codestarts.quarkus.QuarkusCodestartData.QuarkusDataKey.APP_CONFIG;
 import static io.quarkus.devtools.project.codegen.ProjectGenerator.*;
 import static java.util.Objects.requireNonNull;
 
@@ -13,6 +14,7 @@ import io.quarkus.devtools.project.codegen.SourceType;
 import io.quarkus.platform.tools.ToolsConstants;
 import io.quarkus.platform.tools.ToolsUtils;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -21,6 +23,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.lang.model.SourceVersion;
+import org.apache.commons.lang3.StringUtils;
 
 /**
  * Instances of this class are not thread-safe. They are created per invocation.
@@ -33,9 +36,9 @@ public class CreateProject {
 
     public static final String NO_DOCKERFILES = ToolsUtils.dotJoin(ToolsConstants.QUARKUS, NAME, "no-dockerfiles");
     public static final String NO_BUILDTOOL_WRAPPER = ToolsUtils.dotJoin(ToolsConstants.QUARKUS, NAME, "no-buildtool-wrapper");
-    public static final String NO_EXAMPLES = ToolsUtils.dotJoin(ToolsConstants.QUARKUS, NAME, "no-examples");
-    public static final String CODESTARTS = ToolsUtils.dotJoin(ToolsConstants.QUARKUS, NAME, "codestarts");
-    public static final String OVERRIDE_EXAMPLES = ToolsUtils.dotJoin(ToolsConstants.QUARKUS, NAME, "examples");
+    public static final String NO_CODE = ToolsUtils.dotJoin(ToolsConstants.QUARKUS, NAME, "no-code");
+    public static final String EXAMPLE = ToolsUtils.dotJoin(ToolsConstants.QUARKUS, NAME, "example");
+    public static final String EXTRA_CODESTARTS = ToolsUtils.dotJoin(ToolsConstants.QUARKUS, NAME, "extra-codestarts");
 
     private static final Pattern JAVA_VERSION_PATTERN = Pattern.compile("(?:1\\.)?(\\d+)(?:\\..*)?");
 
@@ -90,6 +93,11 @@ public class CreateProject {
         return this;
     }
 
+    public CreateProject extraCodestarts(Set<String> extraCodestarts) {
+        setValue(EXTRA_CODESTARTS, extraCodestarts);
+        return this;
+    }
+
     public CreateProject javaTarget(String javaTarget) {
         this.javaTarget = javaTarget;
         return this;
@@ -97,6 +105,16 @@ public class CreateProject {
 
     public CreateProject resourcePath(String resourcePath) {
         setValue(RESOURCE_PATH, resourcePath);
+        return this;
+    }
+
+    public CreateProject appConfig(String appConfigAsString) {
+        Map<String, String> configMap = Collections.emptyMap();
+
+        if (StringUtils.isNoneBlank(appConfigAsString)) {
+            configMap = ToolsUtils.stringToMap(appConfigAsString, ",", "=");
+        }
+        setValue(APP_CONFIG.key(), configMap);
         return this;
     }
 
@@ -134,23 +152,18 @@ public class CreateProject {
         return this;
     }
 
-    public CreateProject codestarts(Set<String> codestarts) {
-        setValue(CODESTARTS, codestarts);
+    public CreateProject example(String example) {
+        setValue(EXAMPLE, example);
         return this;
     }
 
-    public CreateProject overrideExamples(Set<String> overrideExamples) {
-        setValue(OVERRIDE_EXAMPLES, overrideExamples);
+    public CreateProject noCode(boolean value) {
+        setValue(NO_CODE, value);
         return this;
     }
 
-    public CreateProject noExamples(boolean value) {
-        setValue(NO_EXAMPLES, value);
-        return this;
-    }
-
-    public CreateProject noExamples() {
-        return noExamples(true);
+    public CreateProject noCode() {
+        return noCode(true);
     }
 
     public CreateProject noBuildToolWrapper(boolean value) {

@@ -127,10 +127,17 @@ triage:
         - extensions/vertx-graphql/
         - integration-tests/vertx-graphql/
     - labels: [area/tracing, area/smallrye]
-      title: "(trace|tracing|telemetry)"
+      title: "(trace|tracing)"
       notify: [kenfinnigan, Ladicek]
       directories:
         - extensions/smallrye-opentracing/
+    - labels: [area/tracing]
+      title: "(trace|opentelemetry)"
+      notify: [kenfinnigan]
+      notifyInPullRequest: true
+      directories:
+        - extensions/opentelemetry/
+        - extensions/opentelemetry-exporter-jaeger/
     - labels: [area/security, area/smallrye]
       title: "jwt"
       notify: [sberyozkin]
@@ -139,12 +146,14 @@ triage:
       notify: [sberyozkin]
     - labels: [area/metrics, area/smallrye]
       title: "metrics"
-      notify: [jmartisk]
+      notify: [jmartisk, ebullient]
+      notifyInPullRequest: true
       directories:
         - extensions/smallrye-metrics
     - labels: [area/metrics]
       title: "micrometer"
-      notify: [ebullient]
+      notify: [ebullient, phillip-kruger]
+      notifyInPullRequest: true
       directories:
         - extensions/micrometer
     - labels: [area/health, area/smallrye]
@@ -179,12 +188,12 @@ triage:
         - extensions/resteasy-qute/
     - labels: [area/reactive-messaging, area/smallrye]
       title: "reactive.messaging"
-      notify: [cescoffier, kenfinnigan, phillip-kruger]
+      notify: [cescoffier, kenfinnigan, phillip-kruger, michalszynkiewicz]
       directories:
         - extensions/smallrye-reactive-messaging
     - labels: [area/rest-client]
       title: "rest.client"
-      notify: [phillip-kruger]
+      notify: [michalszynkiewicz]
       directories:
         - extensions/rest-client/
     - labels: [area/smallrye]
@@ -290,8 +299,10 @@ triage:
         - extensions/cache/
         - integration-tests/cache/
     - labels: [area/cli]
+      title: "cli |qs "
       directories:
         - devtools/cli/
+      notify: [maxandersen,ebullient,gsmet]
     - labels: [area/config]
       directories:
         - extensions/config-yaml/
@@ -351,13 +362,9 @@ triage:
     - labels: [area/platform]
       directories:
         - independent-projects/tools/
-    - labels: [area/reactive]
+    - labels: [area/reactive-streams-operators]
       directories:
-        - extensions/reactive-mysql-client/
-        - extensions/reactive-pg-client/
         - extensions/reactive-streams-operators/
-        - integration-tests/reactive-mysql-client/
-        - integration-tests/reactive-pg-client/
     - labels: [area/resteasy]
       directories:
         - extensions/resteasy/
@@ -407,7 +414,7 @@ triage:
         - extensions/websockets/
     - labels: [area/swagger-ui]
       title: "swagger"
-      notify: [phillip-kruger]
+      notify: [phillip-kruger, MikeEdgar]
       directories:
         - extensions/swagger-ui/
     - labels: [area/security]
@@ -436,4 +443,38 @@ triage:
       notify: [ge0ffrey, rsynek, Christopher-Chianelli]
     - labels: [kind/extension-proposal]
       title: quarkiverse
-      notify: [gastaldi, gsmet, aloubyansky]
+      notify: [gastaldi, gsmet, aloubyansky, maxandersen]
+    - labels: [area/mailer]
+      title: "\\bmail\\b"
+      notify: [cescoffier]
+      directories:
+        - extensions/mailer/
+        - integration-tests/mailer/
+    - labels: [area/agroal]
+      title: "agroal"
+      notify: [barreiro, Sanne, yrodiere]
+      directories:
+        - extensions/agroal/
+    - labels: [area/continuous-testing]
+      title: "continuous.testing"
+      notify: [stuartwdouglas]
+    - labels: [area/devservices]
+      title: "dev.?services"
+      notify: [stuartwdouglas]
+    - labels: [area/reactive-sql-clients]
+      title: "(reactive sql|reactive pool|pgpool|mysqlpool|db2pool)"
+      notify: [tsegismont,vietj]
+      directories:
+        - extensions/reactive-db2-client/
+        - extensions/reactive-mysql-client/
+        - extensions/reactive-pg-client/
+        - integration-tests/reactive-db2-client/
+        - integration-tests/reactive-mysql-client/
+        - integration-tests/reactive-pg-client/
+    - labels: [area/adr]
+      title: "adr"
+      notify: [cescoffier]
+      directories:
+        - adr/
+  qe:
+    notify: [rsvoboda, mjurc]

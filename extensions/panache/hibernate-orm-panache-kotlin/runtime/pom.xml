@@ -71,14 +71,6 @@
         </dependency>
     </dependencies>
 
-    <pluginRepositories>
-        <pluginRepository>
-            <id>jcenter</id>
-            <name>JCenter</name>
-            <url>https://jcenter.bintray.com/</url>
-        </pluginRepository>
-        </pluginRepositories>
-
     <build>
         <plugins>
             <plugin>
@@ -101,7 +93,6 @@
             <plugin>
                 <groupId>org.jetbrains.kotlin</groupId>
                 <artifactId>kotlin-maven-plugin</artifactId>
-                <version>${kotlin.version}</version>
                 <executions>
                     <execution>
                         <id>compile</id>
@@ -124,9 +115,6 @@
                         </goals>
                     </execution>
                 </executions>
-                <configuration>
-                    <jvmTarget>1.8</jvmTarget>
-                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -157,29 +145,32 @@
                 </executions>
             </plugin>
             <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <configuration>
+                    <failOnError>false</failOnError>
+                </configuration>
+            </plugin>
+            <plugin>
                 <groupId>org.jetbrains.dokka</groupId>
                 <artifactId>dokka-maven-plugin</artifactId>
-                <version>0.10.1</version>
+                <version>1.4.30</version>
                 <executions>
                     <execution>
                         <id>javadoc</id>
-                        <phase>pre-site</phase>
+                        <phase>deploy</phase>
                         <goals>
-                            <goal>dokka</goal>
+                            <goal>javadocJar</goal>
                         </goals>
                     </execution>
                 </executions>
                 <configuration>
-                    <jdkVersion>8</jdkVersion>
+                    <jdkVersion>11</jdkVersion>
                     <outputFormat>html</outputFormat>
-                    <sourceDirectories>
-                        <sourceDirectory>src/main/kotlin</sourceDirectory>
-                    </sourceDirectories>
                     <externalDocumentationLinks>
                         <link>
                             <!-- Root URL of the generated documentation to link with. The trailing slash is required! -->
-                            <url>https://docs.oracle.com/javase/8/docs/api/</url>
-                            <packageListUrl>https://docs.oracle.com/javase/8/docs/api/package-list</packageListUrl>
+                            <url>https://docs.oracle.com/en/java/javase/11/docs/api/</url>
                         </link>
                     </externalDocumentationLinks>
                 </configuration>

@@ -11,11 +11,6 @@ var streamingPath = myself.attr('data-streamingPath');
 if (typeof streamingPath === "undefined" ) {
    var streamingPath = "/dev/logstream";
 }
-// See if we should show on start
-var showOnStart = myself.attr('data-showOnStart');   
-if (typeof showOnStart === "undefined" ) {
-   var showOnStart = false;
-}
 
 var zoom = 0.90;
 var linespace = 1.00;
@@ -34,9 +29,6 @@ var filter = "";
 var localstoragekey = "quarkus_logging_manager_state";
 
 $('document').ready(function () {
-    if(!showOnStart){
-        hideLog();
-    }
     loadSettings();
     
     openSocket();
@@ -44,15 +36,6 @@ $('document').ready(function () {
     window.onbeforeunload = function () {
         closeSocket();
     };
-    
-    logstreamResizeButton.addEventListener("mousedown", function(e){
-        m_pos = e.y;
-        document.addEventListener("mousemove", resize, false);   
-    }, false);
-
-    document.addEventListener("mouseup", function(){
-        document.removeEventListener("mousemove", resize, false);
-    }, false);
     
     logstreamStopStartButton.addEventListener("click", stopStartEvent);
     logstreamClearLogButton.addEventListener("click", clearScreenEvent);
@@ -164,29 +147,6 @@ function saveSettings(){
     localStorage.setItem(localstoragekey, JSON.stringify(state));
 }
 
-function showLog(){
-    $("#logstreamFooter").css("height", "33vh");
-    $("#logstreamManager").show();
-    $("#logstreamViewLogButton").hide();
-    $("#logstreamHideLogButton").show();
-    var element = document.getElementById("logstreamManager");
-    element.scrollIntoView({block: "end"});
-}
-
-function hideLog(){
-    $("#logstreamFooter").css("height", "unset");
-    $("#logstreamViewLogButton").show();
-    $("#logstreamHideLogButton").hide();
-    $("#logstreamManager").hide();
-}
-
-function resize(e){
-    const dx = m_pos - e.y;
-    m_pos = e.y;
-    const panel = document.getElementById("logstreamFooter");
-    panel.style.height = (parseInt(getComputedStyle(panel, '').height) + dx) + "px";
-}
-
 function addControlCListener(){
     // Add listener to stop
     var ctrlDown = false,
@@ -203,7 +163,9 @@ function addControlCListener(){
     });
 
     $(document).keydown(function (e) {
-        if (ctrlDown && (e.keyCode === cKey))stopLog();
+        if (e.target.tagName === "BODY") {
+            if (ctrlDown && (e.keyCode === cKey))stopLog();
+        }
     });
 }
 
@@ -221,32 +183,38 @@ function addScrollListener(){
 }
 
 function addLineSpaceListener(){
-    $(document).keydown(function (event) {
-        if (event.shiftKey && event.keyCode === 38) {
-            lineSpaceIncreaseEvent();
-        }else if (event.shiftKey && event.keyCode === 40) {
-            lineSpaceDecreaseEvent();
+    $(document).keydown(function (e) {
+        if (e.target.tagName === "BODY") {
+            if (e.shiftKey && e.keyCode === 38) {
+                lineSpaceIncreaseEvent();
+            }else if (e.shiftKey && e.keyCode === 40) {
+                lineSpaceDecreaseEvent();
+            }
         }
     });
 }
 
 function addTabSizeListener(){
-    $(document).keydown(function (event) {
-        if (event.shiftKey && event.keyCode === 39) {
-            tabSpaceIncreaseEvent();
-        }else if (event.shiftKey && event.keyCode === 37) {
-            tabSpaceDecreaseEvent();
+    $(document).keydown(function (e) {
+        if (e.target.tagName === "BODY") {
+            if (e.shiftKey && e.keyCode === 39) {
+                tabSpaceIncreaseEvent();
+            }else if (e.shiftKey && e.keyCode === 37) {
+                tabSpaceDecreaseEvent();
+            }
         }
     });
 }
 
 function addEnterListener(){
     $(document).keydown(function (e) {
-        if (e.keyCode === 13 && !$('#logstreamFilterModal').hasClass('show')){
-            writeResponse("</br>");
-            var element = document.getElementById("logstreamLogTerminal");
-            element.scrollIntoView({block: "end"});
-        } 
+        if (e.target.tagName === "BODY") {
+            if (e.keyCode === 13 && !$('#logstreamFilterModal').hasClass('show')){
+                writeResponse("</br>");
+                var element = document.getElementById("logstreamLogTerminal");
+                element.scrollIntoView({block: "end"});
+            } 
+        }
     });
 }
 

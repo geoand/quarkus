@@ -103,7 +103,8 @@ public class SwaggerUiProcessor {
                     SWAGGER_UI_WEBJAR_ARTIFACT_ID);
 
             if (launchMode.getLaunchMode().isDevOrTest()) {
-                Path tempPath = WebJarUtil.copyResourcesForDevOrTest(curateOutcomeBuildItem, launchMode, artifact,
+                Path tempPath = WebJarUtil.copyResourcesForDevOrTest(liveReloadBuildItem, curateOutcomeBuildItem, launchMode,
+                        artifact,
                         SWAGGER_UI_WEBJAR_PREFIX);
                 // Update index.html
                 WebJarUtil.updateFile(tempPath.resolve("index.html"),
@@ -160,12 +161,11 @@ public class SwaggerUiProcessor {
                     .displayOnNotFoundPage("Open API UI")
                     .routeConfigKey("quarkus.swagger-ui.path")
                     .handler(handler)
-                    .requiresLegacyRedirect()
                     .build());
+
             routes.produce(nonApplicationRootPathBuildItem.routeBuilder()
-                    .route(swaggerUiConfig.path + "/*")
+                    .route(swaggerUiConfig.path + "*")
                     .handler(handler)
-                    .requiresLegacyRedirect()
                     .build());
         }
     }

@@ -1,14 +1,13 @@
 package io.quarkus.registry.client.maven;
 
-import io.quarkus.bootstrap.resolver.maven.MavenArtifactResolver;
 import io.quarkus.devtools.messagewriter.MessageWriter;
 import io.quarkus.maven.ArtifactCoords;
-import io.quarkus.registry.Constants;
 import io.quarkus.registry.RegistryResolutionException;
 import io.quarkus.registry.catalog.ExtensionCatalog;
 import io.quarkus.registry.catalog.json.JsonCatalogMapperHelper;
 import io.quarkus.registry.catalog.json.JsonExtensionCatalog;
 import io.quarkus.registry.client.RegistryPlatformExtensionsResolver;
+import io.quarkus.registry.util.PlatformArtifacts;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Objects;
@@ -17,10 +16,10 @@ import org.eclipse.aether.artifact.DefaultArtifact;
 
 public class MavenPlatformExtensionsResolver implements RegistryPlatformExtensionsResolver {
 
-    private final MavenArtifactResolver artifactResolver;
+    private final MavenRegistryArtifactResolver artifactResolver;
     private final MessageWriter log;
 
-    public MavenPlatformExtensionsResolver(MavenArtifactResolver artifactResolver,
+    public MavenPlatformExtensionsResolver(MavenRegistryArtifactResolver artifactResolver,
             MessageWriter log) {
         this.artifactResolver = Objects.requireNonNull(artifactResolver);
         this.log = Objects.requireNonNull(log);
@@ -37,15 +36,13 @@ public class MavenPlatformExtensionsResolver implements RegistryPlatformExtensio
             version = platformCoords.getVersion();
         }
         final String groupId = platformCoords.getGroupId();
-        final String artifactId = platformCoords.getArtifactId().endsWith(Constants.PLATFORM_DESCRIPTOR_ARTIFACT_ID_SUFFIX)
-                ? platformCoords.getArtifactId()
-                : platformCoords.getArtifactId() + Constants.PLATFORM_DESCRIPTOR_ARTIFACT_ID_SUFFIX;
+        final String artifactId = PlatformArtifacts.ensureCatalogArtifactId(platformCoords.getArtifactId());
         final String classifier = version;
         final Artifact catalogArtifact = new DefaultArtifact(groupId, artifactId, classifier, "json", version);
         log.debug("Resolving platform extension catalog %s", catalogArtifact);
         final Path jsonPath;
         try {
-            jsonPath = artifactResolver.resolve(catalogArtifact).getArtifact().getFile().toPath();
+            jsonPath = artifactResolver.resolve(catalogArtifact);
         } catch (Exception e) {
             throw new RegistryResolutionException("Failed to resolve Quarkus extensions catalog " + catalogArtifact,
                     e);
@@ -60,11 +57,7 @@ public class MavenPlatformExtensionsResolver implements RegistryPlatformExtensio
     private String resolveLatestBomVersion(ArtifactCoords bom, String versionRange)
             throws RegistryResolutionException {
         final Artifact bomArtifact = new DefaultArtifact(bom.getGroupId(),
-                bom.getArtifactId().endsWith(Constants.PLATFORM_DESCRIPTOR_ARTIFACT_ID_SUFFIX)
-                        ? bom.getArtifactId().substring(0,
-                                bom.getArtifactId().length()
-                                        - Constants.PLATFORM_DESCRIPTOR_ARTIFACT_ID_SUFFIX.length())
-                        : bom.getArtifactId(),
+                PlatformArtifacts.ensureBomArtifactId(bom.getArtifactId()),
                 "", "pom", bom.getVersion());
         log.debug("Resolving the latest version of %s:%s:%s:%s in the range %s", bom.getGroupId(), bom.getArtifactId(),
                 bom.getClassifier(), bom.getType(), versionRange);

@@ -679,7 +679,7 @@ public final class BuildTimeConfigurationReader {
                         throw toError(e);
                     }
                 } else {
-                    converter = config.getConverter(leaf.getLeafType());
+                    converter = config.requireConverter(leaf.getLeafType());
                 }
             } else if (valueType instanceof LowerBoundCheckOf) {
                 // todo: add in bounds checker
@@ -728,6 +728,9 @@ public final class BuildTimeConfigurationReader {
             Set<String> properties = new HashSet<>();
             for (ConfigSource configSource : config.getConfigSources()) {
                 properties.addAll(configSource.getPropertyNames());
+            }
+            for (String propertyName : config.getPropertyNames()) {
+                properties.add(propertyName);
             }
             return properties;
         }

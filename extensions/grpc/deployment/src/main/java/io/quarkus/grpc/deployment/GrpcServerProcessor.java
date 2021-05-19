@@ -1,6 +1,7 @@
 package io.quarkus.grpc.deployment;
 
 import static io.quarkus.deployment.Feature.GRPC_SERVER;
+import static io.quarkus.grpc.deployment.GrpcDotNames.GRPC_SERVICE;
 import static java.util.Arrays.asList;
 
 import java.lang.reflect.Modifier;
@@ -15,9 +16,12 @@ import org.jboss.jandex.ClassInfo;
 import org.jboss.jandex.MethodInfo;
 import org.jboss.logging.Logger;
 
+import io.grpc.BindableService;
 import io.grpc.internal.ServerImpl;
 import io.quarkus.arc.deployment.AdditionalBeanBuildItem;
-import io.quarkus.arc.processor.DotNames;
+import io.quarkus.arc.deployment.ValidationPhaseBuildItem;
+import io.quarkus.arc.processor.BeanInfo;
+import io.quarkus.arc.processor.BuiltinScope;
 import io.quarkus.deployment.IsDevelopment;
 import io.quarkus.deployment.IsNormal;
 import io.quarkus.deployment.annotations.BuildProducer;
@@ -28,9 +32,11 @@ import io.quarkus.deployment.builditem.BytecodeTransformerBuildItem;
 import io.quarkus.deployment.builditem.CombinedIndexBuildItem;
 import io.quarkus.deployment.builditem.ExtensionSslNativeSupportBuildItem;
 import io.quarkus.deployment.builditem.FeatureBuildItem;
+import io.quarkus.deployment.builditem.LaunchModeBuildItem;
 import io.quarkus.deployment.builditem.ServiceStartBuildItem;
 import io.quarkus.deployment.builditem.ShutdownContextBuildItem;
 import io.quarkus.deployment.builditem.nativeimage.NativeImageResourceBuildItem;
+import io.quarkus.grpc.GrpcService;
 import io.quarkus.grpc.deployment.devmode.FieldDefinalizingVisitor;
 import io.quarkus.grpc.runtime.GrpcContainer;
 import io.quarkus.grpc.runtime.GrpcServerRecorder;
@@ -38,7 +44,11 @@ import io.quarkus.grpc.runtime.config.GrpcConfiguration;
 import io.quarkus.grpc.runtime.config.GrpcServerBuildTimeConfig;
 import io.quarkus.grpc.runtime.health.GrpcHealthEndpoint;
 import io.quarkus.grpc.runtime.health.GrpcHealthStorage;
+import io.quarkus.grpc.runtime.supports.context.GrpcEnableRequestContext;
+import io.quarkus.grpc.runtime.supports.context.GrpcRequestContextCdiInterceptor;
 import io.quarkus.kubernetes.spi.KubernetesPortBuildItem;
+import io.quarkus.netty.deployment.MinNettyAllocatorMaxOrderBuildItem;
+import io.quarkus.runtime.LaunchMode;
 import io.quarkus.smallrye.health.deployment.spi.HealthBuildItem;
 import io.quarkus.vertx.deployment.VertxBuildItem;
 
@@ -53,19 +63,43 @@ public class GrpcServerProcessor {
     private static final String TRUST_STORE = SSL_PREFIX + "trust-store";
 
     @BuildStep
+    MinNettyAllocatorMaxOrderBuildItem setMinimalNettyMaxOrderSize() {
+        return new MinNettyAllocatorMaxOrderBuildItem(3);
+    }
+
+    @BuildStep
     void discoverBindableServices(BuildProducer<BindableServiceBuildItem> bindables,
             CombinedIndexBuildItem combinedIndexBuildItem) {
         Collection<ClassInfo> bindableServices = combinedIndexBuildItem.getIndex()
                 .getAllKnownImplementors(GrpcDotNames.BINDABLE_SERVICE);
+
         for (ClassInfo service : bindableServices) {
-            if (!Modifier.isAbstract(service.flags()) && service.classAnnotation(DotNames.SINGLETON) != null) {
-                BindableServiceBuildItem item = new BindableServiceBuildItem(service.name());
-                for (MethodInfo method : service.methods()) {
-                    if (method.hasAnnotation(GrpcDotNames.BLOCKING)) {
-                        item.registerBlockingMethod(method.name());
-                    }
+            if (Modifier.isAbstract(service.flags())) {
+                continue;
+            }
+            BindableServiceBuildItem item = new BindableServiceBuildItem(service.name());
+            for (MethodInfo method : service.methods()) {
+                if (method.hasAnnotation(GrpcDotNames.BLOCKING)) {
+                    item.registerBlockingMethod(method.name());
                 }
-                bindables.produce(item);
+            }
+            bindables.produce(item);
+        }
+    }
+
+    @BuildStep
+    void validateBindableServices(ValidationPhaseBuildItem validationPhase,
+            BuildProducer<ValidationPhaseBuildItem.ValidationErrorBuildItem> errors) {
+        for (BeanInfo bean : validationPhase.getContext().beans().classBeans().withBeanType(BindableService.class)) {
+            //noinspection OptionalGetWithoutIsPresent
+            if (bean.getTarget().get().asClass().classAnnotation(GRPC_SERVICE) == null) {
+                errors.produce(new ValidationPhaseBuildItem.ValidationErrorBuildItem(
+                        new IllegalStateException(
+                                "A gRPC service bean must be annotated with io.quarkus.GrpcService: " + bean)));
+            }
+            if (!bean.getScope().getDotName().equals(BuiltinScope.SINGLETON.getName())) {
+                errors.produce(new ValidationPhaseBuildItem.ValidationErrorBuildItem(
+                        new IllegalStateException("A gRPC service bean must have the javax.inject.Singleton scope: " + bean)));
             }
         }
     }
@@ -81,9 +115,14 @@ public class GrpcServerProcessor {
     }
 
     @BuildStep
-    void buildContainerBean(BuildProducer<AdditionalBeanBuildItem> beans,
+    void registerBeans(BuildProducer<AdditionalBeanBuildItem> beans,
             List<BindableServiceBuildItem> bindables, BuildProducer<FeatureBuildItem> features) {
-        if (!bindables.isEmpty()) {
+        // @GrpcService is a CDI stereotype
+        beans.produce(new AdditionalBeanBuildItem(GrpcService.class));
+        beans.produce(new AdditionalBeanBuildItem(GrpcRequestContextCdiInterceptor.class));
+        beans.produce(new AdditionalBeanBuildItem(GrpcEnableRequestContext.class));
+
+        if (!bindables.isEmpty() || LaunchMode.current() == LaunchMode.DEVELOPMENT) {
             beans.produce(AdditionalBeanBuildItem.unremovableOf(GrpcContainer.class));
             features.produce(new FeatureBuildItem(GRPC_SERVER));
         } else {
@@ -95,6 +134,7 @@ public class GrpcServerProcessor {
     @Record(value = ExecutionTime.RUNTIME_INIT)
     ServiceStartBuildItem build(GrpcServerRecorder recorder, GrpcConfiguration config,
             ShutdownContextBuildItem shutdown, List<BindableServiceBuildItem> bindables,
+            LaunchModeBuildItem launchModeBuildItem,
             VertxBuildItem vertx) {
 
         // Build the list of blocking methods per service implementation
@@ -106,7 +146,7 @@ public class GrpcServerProcessor {
         }
 
         if (!bindables.isEmpty()) {
-            recorder.initializeGrpcServer(vertx.getVertx(), config, shutdown, blocking);
+            recorder.initializeGrpcServer(vertx.getVertx(), config, shutdown, blocking, launchModeBuildItem.getLaunchMode());
             return new ServiceStartBuildItem(GRPC_SERVER);
         }
         return null;

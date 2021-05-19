@@ -35,11 +35,16 @@ public class HttpRemoteDevClient implements RemoteDevClient {
     private final String url;
     private final String password;
     private final long reconnectTimeoutMillis;
+    private final long retryIntervalMillis;
+    private final int retryMaxAttempts;
 
-    public HttpRemoteDevClient(String url, String password, Duration reconnectTimeout) {
+    public HttpRemoteDevClient(String url, String password, Duration reconnectTimeout, Duration retryInterval,
+            int retryMaxAttempts) {
         this.url = url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
         this.password = password;
         this.reconnectTimeoutMillis = reconnectTimeout.toMillis();
+        this.retryIntervalMillis = retryInterval.toMillis();
+        this.retryMaxAttempts = retryMaxAttempts;
     }
 
     @Override
@@ -129,10 +134,11 @@ public class HttpRemoteDevClient implements RemoteDevClient {
             String session = connection.getHeaderField(RemoteSyncHandler.QUARKUS_SESSION);
             String error = connection.getHeaderField(RemoteSyncHandler.QUARKUS_ERROR);
             if (error != null) {
-                throw new IOException("Server did not start a remote dev session: " + error);
+                throw createIOException("Server did not start a remote dev session: " + error);
             }
             if (session == null) {
-                throw new IOException("Server did not start a remote dev session");
+                throw createIOException(
+                        "Server did not start a remote dev session. Make sure the environment variable 'QUARKUS_LAUNCH_DEVMODE' is set to 'true' when launching the server");
             }
             String result = new String(IoUtil.readBytes(connection.getInputStream()), StandardCharsets.UTF_8);
             Set<String> changed = new HashSet<>();
@@ -157,6 +163,12 @@ public class HttpRemoteDevClient implements RemoteDevClient {
                 log.info("Connected to remote server");
             }
             return session;
+        }
+
+        private IOException createIOException(String message) {
+            IOException result = new IOException(message);
+            result.setStackTrace(new StackTraceElement[] {});
+            return result;
         }
 
         @Override
@@ -232,12 +244,12 @@ public class HttpRemoteDevClient implements RemoteDevClient {
                 } catch (Throwable e) {
                     errorCount++;
                     log.error("Remote dev request failed", e);
-                    if (errorCount == 10) {
+                    if (errorCount == retryMaxAttempts) {
                         log.error("Connection failed after 10 retries, exiting");
                         return;
                     }
                     try {
-                        Thread.sleep(2000);
+                        Thread.sleep(retryIntervalMillis);
                     } catch (InterruptedException ex) {
 
                     }

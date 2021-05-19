@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Test;
 
-import io.quarkus.devtools.PlatformAwareTestBase;
+import io.quarkus.devtools.testing.PlatformAwareTestBase;
 import io.quarkus.maven.ArtifactCoords;
 import io.quarkus.platform.catalog.processor.ProcessedCategory;
 import io.quarkus.registry.catalog.Category;
@@ -30,7 +30,8 @@ public class CatalogProcessorTest extends PlatformAwareTestBase {
                 .map(Extension::getArtifact)
                 .map(ArtifactCoords::getArtifactId)
                 .startsWith("quarkus-resteasy", "quarkus-resteasy-jackson",
-                        "quarkus-resteasy-jsonb", "quarkus-vertx-http",
-                        "quarkus-vertx-graphql", "quarkus-hibernate-validator");
+                        "quarkus-resteasy-jsonb", "quarkus-apache-httpclient",
+                        "quarkus-vertx-http", "quarkus-vertx-graphql",
+                        "quarkus-hibernate-validator");
     }
 }

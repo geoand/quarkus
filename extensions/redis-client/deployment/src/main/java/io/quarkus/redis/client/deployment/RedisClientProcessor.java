@@ -28,6 +28,7 @@ import io.quarkus.deployment.builditem.FeatureBuildItem;
 import io.quarkus.deployment.builditem.nativeimage.RuntimeInitializedClassBuildItem;
 import io.quarkus.redis.client.RedisClient;
 import io.quarkus.redis.client.RedisClientName;
+import io.quarkus.redis.client.RedisHostsProvider;
 import io.quarkus.redis.client.reactive.ReactiveRedisClient;
 import io.quarkus.redis.client.runtime.MutinyRedis;
 import io.quarkus.redis.client.runtime.MutinyRedisAPI;
@@ -54,6 +55,14 @@ public class RedisClientProcessor {
     }
 
     @BuildStep
+    AdditionalBeanBuildItem registerAdditionalBeans() {
+        return new AdditionalBeanBuildItem.Builder()
+                .setUnremovable()
+                .addBeanClass(RedisHostsProvider.class)
+                .build();
+    }
+
+    @BuildStep
     List<AdditionalBeanBuildItem> registerRedisBeans() {
         return Arrays.asList(
                 AdditionalBeanBuildItem
@@ -74,8 +83,15 @@ public class RedisClientProcessor {
     }
 
     @BuildStep
-    RuntimeInitializedClassBuildItem initializeBulkTypeDuringRuntime() {
-        return new RuntimeInitializedClassBuildItem(BulkType.class.getName());
+    public void registerRuntimeInitializedClasses(BuildProducer<RuntimeInitializedClassBuildItem> producer) {
+        producer.produce(new RuntimeInitializedClassBuildItem(BulkType.class.getName()));
+        // Classes using SplittableRandom, which need to be runtime initialized
+        producer.produce(new RuntimeInitializedClassBuildItem("io.vertx.redis.client.impl.RedisSentinelClient"));
+        producer.produce(new RuntimeInitializedClassBuildItem("io.vertx.redis.client.impl.Slots"));
+        producer.produce(new RuntimeInitializedClassBuildItem("io.vertx.redis.client.impl.RedisClusterConnection"));
+        // RedisClusterConnections is referenced from RedisClusterClient. Thus, we need to runtime-init
+        // that too.
+        producer.produce(new RuntimeInitializedClassBuildItem("io.vertx.redis.client.impl.RedisClusterClient"));
     }
 
     @BuildStep

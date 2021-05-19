@@ -95,6 +95,8 @@ public class BootstrapMavenContext {
     private static final String userHome = PropertyUtils.getUserHome();
     private static final File userMavenConfigurationHome = new File(userHome, ".m2");
 
+    private static final String EFFECTIVE_MODEL_BUILDER_PROP = "quarkus.bootstrap.effective-model-builder";
+
     private boolean artifactTransferLogging;
     private BootstrapMavenOptions cliOptions;
     private File userSettings;
@@ -114,6 +116,8 @@ public class BootstrapMavenContext {
     private DefaultServiceLocator serviceLocator;
     private String alternatePomName;
     private Path rootProjectDir;
+    private boolean preferPomsFromWorkspace;
+    private Boolean effectiveModelBuilder;
 
     public static BootstrapMavenContextConfig<?> config() {
         return new BootstrapMavenContextConfig<>();
@@ -126,7 +130,7 @@ public class BootstrapMavenContext {
     public BootstrapMavenContext(BootstrapMavenContextConfig<?> config)
             throws BootstrapMavenException {
         /*
-         * WARNING: this constructor calls instance method as part of the initialization.
+         * WARNING: this constructor calls instance methods as part of the initialization.
          * This means the values that are available in the config should be set before
          * the instance method invocations.
          */
@@ -140,6 +144,9 @@ public class BootstrapMavenContext {
         this.remoteRepoManager = config.remoteRepoManager;
         this.cliOptions = config.cliOptions;
         this.rootProjectDir = config.rootProjectDir;
+        this.preferPomsFromWorkspace = config.preferPomsFromWorkspace;
+        this.effectiveModelBuilder = config.effectiveModelBuilder;
+        this.userSettings = config.userSettings;
         if (config.currentProject != null) {
             this.currentProject = config.currentProject;
             this.currentPom = currentProject.getRawModel().getPomFile().toPath();
@@ -147,8 +154,15 @@ public class BootstrapMavenContext {
         } else if (config.workspaceDiscovery) {
             currentProject = resolveCurrentProject();
             this.workspace = currentProject == null ? null : currentProject.getWorkspace();
+            if (workspace != null) {
+                if (config.repoSession == null && repoSession != null && repoSession.getWorkspaceReader() == null) {
+                    repoSession = new DefaultRepositorySystemSession(repoSession).setWorkspaceReader(workspace);
+                    if (config.remoteRepos == null && remoteRepos != null) {
+                        remoteRepos = resolveCurrentProjectRepos(remoteRepos);
+                    }
+                }
+            }
         }
-        userSettings = config.userSettings;
     }
 
     public AppArtifact getCurrentProjectArtifact(String extension) throws BootstrapMavenException {
@@ -318,7 +332,7 @@ public class BootstrapMavenContext {
                     if (!tmp.isDirectory()) {
                         tmp = tmp.getParentFile();
                     }
-                    alternatePomDir = tmp.toString();
+                    alternatePomDir = tmp == null ? null : tmp.toString();
                 }
             }
 
@@ -502,12 +516,19 @@ public class BootstrapMavenContext {
 
     private List<RemoteRepository> resolveCurrentProjectRepos(List<RemoteRepository> repos)
             throws BootstrapMavenException {
-        final Model model = loadCurrentProjectModel();
-        if (model == null) {
-            return repos;
+        final Artifact projectArtifact;
+        if (currentProject == null) {
+            final Model model = loadCurrentProjectModel();
+            if (model == null) {
+                return repos;
+            }
+            projectArtifact = new DefaultArtifact(ModelUtils.getGroupId(model), model.getArtifactId(), null, "pom",
+                    ModelUtils.getVersion(model));
+        } else {
+            projectArtifact = new DefaultArtifact(currentProject.getGroupId(), currentProject.getArtifactId(), null, "pom",
+                    currentProject.getVersion());
         }
-        final Artifact projectArtifact = new DefaultArtifact(ModelUtils.getGroupId(model), model.getArtifactId(), "", "pom",
-                ModelUtils.getVersion(model));
+
         final List<RemoteRepository> rawRepos;
         try {
             rawRepos = getRepositorySystem()
@@ -518,6 +539,7 @@ public class BootstrapMavenContext {
         } catch (ArtifactDescriptorException e) {
             throw new BootstrapMavenException("Failed to read artifact descriptor for " + projectArtifact, e);
         }
+
         return getRepositorySystem().newResolutionRepositories(getRepositorySystemSession(), rawRepos);
     }
 
@@ -651,8 +673,7 @@ public class BootstrapMavenContext {
             locator.setServices(WagonConfigurator.class, new BootstrapWagonConfigurator());
             locator.setServices(WagonProvider.class, new BootstrapWagonProvider());
         }
-        locator.setServices(ModelBuilder.class, new MavenModelBuilder(workspace, getCliOptions(),
-                workspace == null ? Collections.emptyList() : getActiveSettingsProfiles()));
+        locator.setServices(ModelBuilder.class, new MavenModelBuilder(this));
         locator.setErrorHandler(new DefaultServiceLocator.ErrorHandler() {
             @Override
             public void serviceCreationFailed(Class<?> type, Class<?> impl, Throwable exception) {
@@ -798,5 +819,17 @@ public class BootstrapMavenContext {
         // with how Maven discovers the workspace and also created issues testing the Quarkus platform
         // due to its specific FS layout
         return rootProjectDir;
+    }
+
+    public boolean isPreferPomsFromWorkspace() {
+        return preferPomsFromWorkspace;
+    }
+
+    public boolean isEffectiveModelBuilder() {
+        if (effectiveModelBuilder == null) {
+            final String s = PropertyUtils.getProperty(EFFECTIVE_MODEL_BUILDER_PROP);
+            effectiveModelBuilder = s == null ? false : Boolean.parseBoolean(s);
+        }
+        return effectiveModelBuilder;
     }
 }

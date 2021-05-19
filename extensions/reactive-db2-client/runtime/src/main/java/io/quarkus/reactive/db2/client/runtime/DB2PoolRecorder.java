@@ -77,6 +77,11 @@ public class DB2PoolRecorder {
             poolOptions.setMaxSize(dataSourceReactiveRuntimeConfig.maxSize.getAsInt());
         }
 
+        if (dataSourceReactiveRuntimeConfig.idleTimeout.isPresent()) {
+            int idleTimeout = Math.toIntExact(dataSourceReactiveRuntimeConfig.idleTimeout.get().toMillis());
+            poolOptions.setIdleTimeout(idleTimeout).setIdleTimeoutUnit(TimeUnit.MILLISECONDS);
+        }
+
         return poolOptions;
     }
 
@@ -144,9 +149,9 @@ public class DB2PoolRecorder {
 
         connectOptions.setReconnectInterval(dataSourceReactiveRuntimeConfig.reconnectInterval.toMillis());
 
-        if (dataSourceReactiveRuntimeConfig.idleTimeout.isPresent()) {
-            int idleTimeout = Math.toIntExact(dataSourceReactiveRuntimeConfig.idleTimeout.get().toMillis());
-            connectOptions.setIdleTimeout(idleTimeout).setIdleTimeoutUnit(TimeUnit.MILLISECONDS);
+        if (dataSourceReactiveRuntimeConfig.hostnameVerificationAlgorithm.isPresent()) {
+            connectOptions.setHostnameVerificationAlgorithm(
+                    dataSourceReactiveRuntimeConfig.hostnameVerificationAlgorithm.get());
         }
 
         return connectOptions;
