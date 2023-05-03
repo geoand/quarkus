@@ -129,11 +129,13 @@ public class QuarkusPluginTest {
                         "        mavenCentral()\n" +
                         "    }\n" +
                         "    dependencies {\n" +
-                        "        classpath(\"org.jetbrains.kotlin:kotlin-gradle-plugin:" + kotlinVersion + "\")\n" +
+                        "        classpath(\"org.jetbrains.kotlin:kotlin-gradle-plugin-api:" + kotlinVersion + "\")\n" +
                         "    }\n" +
                         "}\n" +
                         "\n" +
-                        "apply(plugin = \"org.jetbrains.kotlin.multiplatform\")\n" +
+                        "plugins {\n" +
+                        "  id(\"org.jetbrains.kotlin.multiplatform\") version \"" + kotlinVersion + "\"\n" +
+                        "}\n" +
                         "\n" +
                         "repositories {\n" +
                         "    mavenCentral()\n" +
