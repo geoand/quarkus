@@ -1,10 +1,11 @@
 package io.quarkus.bootstrap.runner;
 
-import java.io.DataInputStream;
+import java.io.DataInput;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.UTFDataFormatException;
+import java.nio.ByteBuffer;
 import java.nio.file.FileVisitResult;
 import java.nio.file.FileVisitor;
 import java.nio.file.Files;
@@ -102,73 +103,71 @@ public class SerializedApplication {
         }
     }
 
-    public static SerializedApplication read(InputStream inputStream, Path appRoot) throws IOException {
-        try (DataInputStream in = new DataInputStream(inputStream)) {
-            if (in.readInt() != MAGIC) {
-                throw new RuntimeException("Wrong magic number");
-            }
-            if (in.readInt() != VERSION) {
-                throw new RuntimeException("Wrong class path version");
-            }
-            String mainClass = in.readUTF();
-            ResourceDirectoryTracker resourceDirectoryTracker = new ResourceDirectoryTracker();
-            Set<String> parentFirstPackages = new HashSet<>();
-            int numPaths = in.readUnsignedShort();
-            ClassLoadingResource[] allClassLoadingResources = new ClassLoadingResource[numPaths];
-            for (int pathCount = 0; pathCount < numPaths; pathCount++) {
-                String path = in.readUTF();
-                boolean hasManifest = in.readBoolean();
-                ManifestInfo info = null;
-                if (hasManifest) {
-                    info = new ManifestInfo(readNullableString(in), readNullableString(in), readNullableString(in),
-                            readNullableString(in), readNullableString(in), readNullableString(in));
-                }
-                JarResource resource = new JarResource(info, appRoot.resolve(path));
-                allClassLoadingResources[pathCount] = resource;
-                int numDirs = in.readUnsignedShort();
-                for (int i = 0; i < numDirs; ++i) {
-                    String dir = in.readUTF();
-                    int j = dir.indexOf('/');
-                    while (j >= 0) {
-                        resourceDirectoryTracker.addResourceDir(dir.substring(0, j), resource);
-                        j = dir.indexOf('/', j + 1);
-                    }
-                    resourceDirectoryTracker.addResourceDir(dir, resource);
-                }
-            }
-            int packages = in.readUnsignedShort();
-            for (int i = 0; i < packages; ++i) {
-                parentFirstPackages.add(in.readUTF());
-            }
-            Set<String> nonExistentResources = new HashSet<>();
-            int nonExistentResourcesSize = in.readUnsignedShort();
-            for (int i = 0; i < nonExistentResourcesSize; i++) {
-                nonExistentResources.add(in.readUTF());
-            }
-            // this map is populated correctly because the JarResource entries are added to allClassLoadingResources
-            // in the same order as the classpath was written during the writing of the index
-            Map<String, ClassLoadingResource[]> directlyIndexedResourcesIndexMap = new HashMap<>();
-            int directlyIndexedSize = in.readUnsignedShort();
-            for (int i = 0; i < directlyIndexedSize; i++) {
-                String resource = in.readUTF();
-                int indexesSize = in.readUnsignedShort();
-                ClassLoadingResource[] matchingResources = new ClassLoadingResource[indexesSize];
-                for (int j = 0; j < indexesSize; j++) {
-                    matchingResources[j] = allClassLoadingResources[in.readUnsignedShort()];
-                }
-                directlyIndexedResourcesIndexMap.put(resource, matchingResources);
-            }
-            RunnerClassLoader runnerClassLoader = new RunnerClassLoader(ClassLoader.getSystemClassLoader(),
-                    resourceDirectoryTracker.getResult(), parentFirstPackages,
-                    nonExistentResources, FULLY_INDEXED_PATHS, directlyIndexedResourcesIndexMap);
-            for (ClassLoadingResource classLoadingResource : allClassLoadingResources) {
-                classLoadingResource.init();
-            }
-            return new SerializedApplication(runnerClassLoader, mainClass);
+    public static SerializedApplication read(DataInput in, Path appRoot) throws IOException {
+        if (in.readInt() != MAGIC) {
+            throw new RuntimeException("Wrong magic number");
         }
+        if (in.readInt() != VERSION) {
+            throw new RuntimeException("Wrong class path version");
+        }
+        String mainClass = in.readUTF();
+        ResourceDirectoryTracker resourceDirectoryTracker = new ResourceDirectoryTracker();
+        Set<String> parentFirstPackages = new HashSet<>();
+        int numPaths = in.readUnsignedShort();
+        ClassLoadingResource[] allClassLoadingResources = new ClassLoadingResource[numPaths];
+        for (int pathCount = 0; pathCount < numPaths; pathCount++) {
+            String path = in.readUTF();
+            boolean hasManifest = in.readBoolean();
+            ManifestInfo info = null;
+            if (hasManifest) {
+                info = new ManifestInfo(readNullableString(in), readNullableString(in), readNullableString(in),
+                        readNullableString(in), readNullableString(in), readNullableString(in));
+            }
+            JarResource resource = new JarResource(info, appRoot.resolve(path));
+            allClassLoadingResources[pathCount] = resource;
+            int numDirs = in.readUnsignedShort();
+            for (int i = 0; i < numDirs; ++i) {
+                String dir = in.readUTF();
+                int j = dir.indexOf('/');
+                while (j >= 0) {
+                    resourceDirectoryTracker.addResourceDir(dir.substring(0, j), resource);
+                    j = dir.indexOf('/', j + 1);
+                }
+                resourceDirectoryTracker.addResourceDir(dir, resource);
+            }
+        }
+        int packages = in.readUnsignedShort();
+        for (int i = 0; i < packages; ++i) {
+            parentFirstPackages.add(in.readUTF());
+        }
+        Set<String> nonExistentResources = new HashSet<>();
+        int nonExistentResourcesSize = in.readUnsignedShort();
+        for (int i = 0; i < nonExistentResourcesSize; i++) {
+            nonExistentResources.add(in.readUTF());
+        }
+        // this map is populated correctly because the JarResource entries are added to allClassLoadingResources
+        // in the same order as the classpath was written during the writing of the index
+        Map<String, ClassLoadingResource[]> directlyIndexedResourcesIndexMap = new HashMap<>();
+        int directlyIndexedSize = in.readUnsignedShort();
+        for (int i = 0; i < directlyIndexedSize; i++) {
+            String resource = in.readUTF();
+            int indexesSize = in.readUnsignedShort();
+            ClassLoadingResource[] matchingResources = new ClassLoadingResource[indexesSize];
+            for (int j = 0; j < indexesSize; j++) {
+                matchingResources[j] = allClassLoadingResources[in.readUnsignedShort()];
+            }
+            directlyIndexedResourcesIndexMap.put(resource, matchingResources);
+        }
+        RunnerClassLoader runnerClassLoader = new RunnerClassLoader(ClassLoader.getSystemClassLoader(),
+                resourceDirectoryTracker.getResult(), parentFirstPackages,
+                nonExistentResources, FULLY_INDEXED_PATHS, directlyIndexedResourcesIndexMap);
+        for (ClassLoadingResource classLoadingResource : allClassLoadingResources) {
+            classLoadingResource.init();
+        }
+        return new SerializedApplication(runnerClassLoader, mainClass);
     }
 
-    private static String readNullableString(DataInputStream in) throws IOException {
+    private static String readNullableString(DataInput in) throws IOException {
         if (in.readBoolean()) {
             return in.readUTF();
         }
@@ -368,6 +367,135 @@ public class SerializedApplication {
 
         private void addToResult(String dir, Set<? extends ClassLoadingResource> jarResources) {
             result.put(dir, jarResources.toArray(EMPTY_ARRAY));
+        }
+    }
+
+    static class BufferDataInput implements DataInput {
+
+        private final ByteBuffer data;
+
+        public BufferDataInput(ByteBuffer data) {
+            this.data = data;
+        }
+
+        @Override
+        public void readFully(byte[] bytes) throws IOException {
+            data.get(bytes);
+        }
+
+        @Override
+        public void readFully(byte[] bytes, int i, int i1) throws IOException {
+            data.get(bytes, i, i1);
+        }
+
+        @Override
+        public int skipBytes(int i) throws IOException {
+            data.position(data.position() + i);
+            return data.position();
+        }
+
+        @Override
+        public boolean readBoolean() throws IOException {
+            return data.get() != 0;
+        }
+
+        @Override
+        public byte readByte() throws IOException {
+            return data.get();
+        }
+
+        @Override
+        public int readUnsignedByte() throws IOException {
+            return data.get() & 0xFF;
+        }
+
+        @Override
+        public short readShort() throws IOException {
+            return data.getShort();
+        }
+
+        @Override
+        public int readUnsignedShort() throws IOException {
+            return data.getShort() & 0xffff;
+        }
+
+        @Override
+        public char readChar() throws IOException {
+            return data.getChar();
+        }
+
+        @Override
+        public int readInt() throws IOException {
+            return data.getInt();
+        }
+
+        @Override
+        public long readLong() throws IOException {
+            return data.getLong();
+        }
+
+        @Override
+        public float readFloat() throws IOException {
+            return data.getFloat();
+        }
+
+        @Override
+        public double readDouble() throws IOException {
+            return data.getDouble();
+        }
+
+        @Override
+        public String readLine() throws IOException {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public String readUTF() throws IOException {
+            int size = readUnsignedShort();
+            char[] string = new char[size];
+            int len = 0;
+            for (int i = 0; i < size; i++, len++) {
+                int b = readUnsignedByte();
+                if ((b > 0x00) && (b < 0x80)) {
+                    string[len] = (char) b;
+                } else {
+                    switch (b >> 4) {
+                        // 2 byte encoding
+                        case 0b1100:
+                        case 0b1101: {
+                            i++;
+                            if (i >= size) {
+                                throw new UTFDataFormatException("partial multi byte charater at end");
+                            }
+                            int b2 = readUnsignedByte();
+                            if ((b2 & 0b1100_0000) != 0b1000_0000) {
+                                throw new UTFDataFormatException("bad encoding at byte: " + (i - 1));
+                            }
+                            string[len] = (char) (((b & 0x1F) << 6) | (b2 & 0x3F));
+                            break;
+                        }
+                        // 3 byte encoding
+                        case 0b1110: {
+                            i += 2;
+                            if (i >= size) {
+                                throw new UTFDataFormatException("partial multi byte charater at end");
+                            }
+                            int b2 = readUnsignedByte();
+                            int b3 = readUnsignedByte();
+                            if (((b2 & 0b1100_0000) != 0b1000_0000) || ((b3 & 0b1100_0000) != 0b1000_0000)) {
+                                throw new UTFDataFormatException("bad encoding at byte: " + (i - 2));
+                            }
+                            string[len] = (char) (((b & 0x0F) << 12) | ((b2 & 0x3F) << 6) | (b3 & 0x3F));
+                            break;
+                        }
+                        // invalid encoding
+                        default: {
+                            throw new UTFDataFormatException("bad encoding at byte: " + i);
+                        }
+                    }
+                }
+            }
+            return new String(string, 0, len);
         }
     }
 

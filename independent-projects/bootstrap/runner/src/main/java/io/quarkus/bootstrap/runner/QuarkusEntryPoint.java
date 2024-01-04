@@ -1,9 +1,8 @@
 package io.quarkus.bootstrap.runner;
 
-import java.io.BufferedInputStream;
+import java.io.DataInput;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.net.MalformedURLException;
@@ -11,8 +10,11 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.nio.MappedByteBuffer;
+import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.List;
 
 import io.quarkus.bootstrap.forkjoin.QuarkusForkJoinWorkerThread;
@@ -50,8 +52,10 @@ public class QuarkusEntryPoint {
         } else {
             SerializedApplication app;
             // the magic number here is close to the smallest possible dat file
-            try (InputStream in = new BufferedInputStream(Files.newInputStream(appRoot.resolve(QUARKUS_APPLICATION_DAT)),
-                    24_576)) {
+            try (var fileChannel = (FileChannel) Files.newByteChannel(appRoot.resolve(QUARKUS_APPLICATION_DAT),
+                    StandardOpenOption.READ)) {
+                MappedByteBuffer bb = fileChannel.map(FileChannel.MapMode.READ_ONLY, 0, fileChannel.size());
+                DataInput in = new SerializedApplication.BufferDataInput(bb);
                 app = SerializedApplication.read(in, appRoot);
             }
             final RunnerClassLoader appRunnerClassLoader = app.getRunnerClassLoader();
