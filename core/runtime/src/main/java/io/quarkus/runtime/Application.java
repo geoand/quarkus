@@ -68,6 +68,7 @@ public abstract class Application implements Closeable {
      *           letting the user hook into it.
      */
     public final void start(String[] args) {
+        preStart();
         if (!auxiliaryApplication) {
             currentApplication = this;
         }
@@ -129,6 +130,8 @@ public abstract class Application implements Closeable {
             stateLock.unlock();
         }
     }
+
+    protected abstract void preStart();
 
     protected abstract void doStart(String[] args);
 

@@ -160,15 +160,15 @@ public class MainClassBuildStep {
         scField.setModifiers(Modifier.PUBLIC | Modifier.STATIC);
 
         FieldCreator quarkusVersionField = file.getFieldCreator(QUARKUS_ANALYTICS_QUARKUS_VERSION, String.class)
-                .setModifiers(Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL);
+                .setModifiers(Modifier.PRIVATE | Modifier.STATIC);
 
         MethodCreator ctor = file.getMethodCreator("<init>", void.class);
         ctor.invokeSpecialMethod(ofMethod(Application.class, "<init>", void.class, boolean.class),
                 ctor.getThis(), ctor.load(launchMode.isAuxiliaryApplication()));
         ctor.returnValue(null);
 
-        MethodCreator mv = file.getMethodCreator("<clinit>", void.class);
-        mv.setModifiers(Modifier.PUBLIC | Modifier.STATIC);
+        MethodCreator mv = file.getMethodCreator("preStart", void.class);
+        mv.setModifiers(Modifier.PUBLIC);
         if (!namingConfig.enableJndi && allowJNDIBuildItems.isEmpty()) {
             mv.invokeStaticMethod(ofMethod(DisabledInitialContextManager.class, "register", void.class));
         }
