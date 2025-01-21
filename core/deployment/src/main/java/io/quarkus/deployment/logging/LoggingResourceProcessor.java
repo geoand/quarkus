@@ -237,6 +237,15 @@ public final class LoggingResourceProcessor {
 
     @BuildStep
     @Record(ExecutionTime.RUNTIME_INIT)
+    void eagerlyLoadClasses(LoggingSetupRecorder recorder) {
+        // some of the JDK infra needed by logging is heavy to bootstrap,
+        // so if possible we do it before logging needs it without blocking
+        // the main thread
+        recorder.eagerlyLoadClasses();
+    }
+
+    @BuildStep
+    @Record(ExecutionTime.RUNTIME_INIT)
     LoggingSetupBuildItem setupLoggingRuntimeInit(
             final RecorderContext context,
             final LoggingSetupRecorder recorder,

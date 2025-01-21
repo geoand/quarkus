@@ -18,6 +18,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TimeZone;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -68,6 +69,7 @@ import io.quarkus.runtime.logging.LogRuntimeConfig.ConsoleConfig;
 import io.quarkus.runtime.logging.LogRuntimeConfig.FileConfig;
 import io.quarkus.runtime.logging.LogRuntimeConfig.SocketConfig;
 import io.quarkus.runtime.shutdown.ShutdownListener;
+import io.smallrye.common.cpu.ProcessorInfo;
 import io.smallrye.config.SmallRyeConfig;
 import io.smallrye.config.SmallRyeConfigBuilder;
 
@@ -80,6 +82,23 @@ public class LoggingSetupRecorder {
 
     public LoggingSetupRecorder(RuntimeValue<ConsoleRuntimeConfig> consoleRuntimeConfig) {
         this.consoleRuntimeConfig = consoleRuntimeConfig;
+    }
+
+    public void eagerlyLoadClasses() {
+        if (ProcessorInfo.availableProcessors() >= 4) {
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    System.console();
+                }
+            }).start();
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    TimeZone.getDefault();
+                }
+            }).start();
+        }
     }
 
     @SuppressWarnings("unused") //called via reflection, as it is in an isolated CL
