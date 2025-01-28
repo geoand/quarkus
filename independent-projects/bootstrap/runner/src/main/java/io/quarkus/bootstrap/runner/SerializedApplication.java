@@ -41,7 +41,7 @@ public class SerializedApplication {
     private static final int VERSION = 2;
 
     private static final ClassLoadingResource[] EMPTY_ARRAY = new ClassLoadingResource[0];
-    private static final JarResource SENTINEL = new JarResource(null, Path.of("wqxehxivam"));
+    private static final ClassLoadingResource SENTINEL = new DirectoryResource(null, Path.of("wqxehxivam"));
 
     private final RunnerClassLoader runnerClassLoader;
     private final String mainClass;
@@ -71,6 +71,7 @@ public class SerializedApplication {
             for (int i = 0; i < classPath.size(); i++) {
                 Path jar = classPath.get(i);
                 String relativePath = applicationRoot.relativize(jar).toString().replace('\\', '/');
+                relativePath = relativePath.substring(0, relativePath.length() - 4);
                 data.writeUTF(relativePath);
                 Collection<String> resources = writeJar(data, jar);
                 for (String resource : resources) {
@@ -123,7 +124,7 @@ public class SerializedApplication {
                     info = new ManifestInfo(readNullableString(in), readNullableString(in), readNullableString(in),
                             readNullableString(in), readNullableString(in), readNullableString(in));
                 }
-                JarResource resource = new JarResource(info, appRoot.resolve(path));
+                ClassLoadingResource resource = new DirectoryResource(info, appRoot.resolve(path));
                 allClassLoadingResources[pathCount] = resource;
                 int numDirs = in.readUnsignedShort();
                 for (int i = 0; i < numDirs; ++i) {
@@ -330,11 +331,11 @@ public class SerializedApplication {
         private final Map<String, ClassLoadingResource[]> result = new HashMap<>();
         private final Map<String, Set<ClassLoadingResource>> overrides = new HashMap<>();
 
-        void addResourceDir(String dir, JarResource resource) {
+        void addResourceDir(String dir, ClassLoadingResource resource) {
             ClassLoadingResource[] existing = result.get(dir);
             if (existing == null) {
                 // this is the first the dir was ever tracked
-                result.put(dir, new JarResource[] { resource });
+                result.put(dir, new ClassLoadingResource[] { resource });
             } else {
                 ClassLoadingResource existingResource = existing[0];
                 if (existingResource.equals(resource)) {
