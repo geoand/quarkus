@@ -7,6 +7,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -103,15 +104,17 @@ public class CaffeineCacheImpl extends AbstractCache implements CaffeineCache {
     public <K, V> Uni<V> getAsync(K key, Function<K, Uni<V>> valueLoader) {
         Objects.requireNonNull(key, NULL_KEYS_NOT_SUPPORTED_MSG);
         Context context = Vertx.currentContext();
+        AtomicReference<CompletableFuture<V>> resultRef = new AtomicReference<>();
         return Uni.createFrom()
                 .completionStage(new Supplier<CompletionStage<V>>() {
+
                     @Override
                     public CompletionStage<V> get() {
                         // When stats are enabled we need to call statsCounter.recordHits(1)/statsCounter.recordMisses(1) accordingly
                         StatsRecorder recorder = recordStats ? new OperationalStatsRecorder() : NoopStatsRecorder.INSTANCE;
                         @SuppressWarnings("unchecked")
-                        CompletionStage<V> result = (CompletionStage<V>) cache.asMap().computeIfAbsent(key,
-                                new Function<Object, CompletableFuture<Object>>() {
+                        CompletableFuture<V> result = (CompletableFuture<V>) cache.asMap().computeIfAbsent(key,
+                                new Function<>() {
                                     @Override
                                     public CompletableFuture<Object> apply(Object key) {
                                         recorder.onValueAbsent();
@@ -121,6 +124,7 @@ public class CaffeineCacheImpl extends AbstractCache implements CaffeineCache {
                                     }
                                 });
                         recorder.doRecord(key);
+                        resultRef.set(result);
                         return result;
                     }
                 })
@@ -158,13 +162,21 @@ public class CaffeineCacheImpl extends AbstractCache implements CaffeineCache {
                             } else {
                                 // 1) We are not on a context (ctx == null) => we need to switch to the captured context.
                                 // 2) We are on a different context (ctx != null) => we need to switch to the captured context.
-                                context.runOnContext(new Handler<Void>() {
+                                context.runOnContext(new Handler<>() {
                                     @Override
                                     public void handle(Void ignored) {
                                         command.run();
                                     }
                                 });
                             }
+                        }
+                    }
+                }).onCancellation().invoke(new Runnable() {
+                    @Override
+                    public void run() {
+                        CompletableFuture<V> cf = resultRef.get();
+                        if (cf != null) {
+                            cf.cancel(true);
                         }
                     }
                 });

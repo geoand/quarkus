@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
+import java.time.Duration;
+
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
@@ -15,6 +17,7 @@ import io.quarkus.cache.CacheInvalidateAll;
 import io.quarkus.cache.CacheResult;
 import io.quarkus.test.QuarkusUnitTest;
 import io.smallrye.mutiny.Uni;
+import io.smallrye.mutiny.subscription.Cancellable;
 
 /**
  * Tests the caching annotations on methods returning {@link Uni}.
@@ -184,5 +187,26 @@ public class UniReturnTypeTest {
         public int getCacheInvalidateAllInvocations() {
             return cacheInvalidateAllInvocations;
         }
+    }
+
+    @Test
+    void cancellationTest() throws InterruptedException {
+
+        Cancellable cancellable = getFooUni().log("downstreamUni")
+                .subscribe().with(s -> {
+                });
+
+        Thread.sleep(Duration.ofSeconds(1).toMillis());
+
+        cancellable.cancel();
+
+        Thread.sleep(Duration.ofSeconds(10).toMillis());
+    }
+
+    @CacheResult(cacheName = "foo_cache")
+    public static Uni<String> getFooUni() {
+        return Uni.createFrom().item("foo")
+                .onItem().delayIt().by(Duration.ofSeconds(3))
+                .log("upstreamUni inside method with @CacheResult");
     }
 }
