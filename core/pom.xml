@@ -21,6 +21,7 @@
         <module>devmode-spi</module>
         <module>launcher</module>
         <module>class-change-agent</module>
+        <module>netty-stackless-agent</module>
         <module>junit4-mock</module>
     </modules>
 </project>
