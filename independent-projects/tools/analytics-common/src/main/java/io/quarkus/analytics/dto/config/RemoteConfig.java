@@ -1,16 +1,26 @@
 package io.quarkus.analytics.dto.config;
 
+import java.io.IOException;
 import java.io.Serializable;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
+import io.quarkus.analytics.util.FileUtils.JsonSerializable;
+import io.quarkus.bootstrap.json.Json;
+import io.quarkus.bootstrap.json.JsonArray;
+import io.quarkus.bootstrap.json.JsonBoolean;
+import io.quarkus.bootstrap.json.JsonDouble;
+import io.quarkus.bootstrap.json.JsonInteger;
+import io.quarkus.bootstrap.json.JsonObject;
+import io.quarkus.bootstrap.json.JsonString;
+import io.quarkus.bootstrap.json.JsonValue;
 
 /**
  * Allow to configure build analytics behaviour by downloading a remote configuration file from a public location.
  */
-public class RemoteConfig implements AnalyticsRemoteConfig, Serializable {
+public class RemoteConfig implements AnalyticsRemoteConfig, Serializable, JsonSerializable {
 
     private boolean active;
     private List<String> denyAnonymousIds;
@@ -40,7 +50,6 @@ public class RemoteConfig implements AnalyticsRemoteConfig, Serializable {
         this.active = active;
     }
 
-    @JsonProperty("deny_anonymous_ids")
     public List<String> getDenyAnonymousIds() {
         return denyAnonymousIds;
     }
@@ -49,7 +58,6 @@ public class RemoteConfig implements AnalyticsRemoteConfig, Serializable {
         this.denyAnonymousIds = denyAnonymousIds;
     }
 
-    @JsonProperty("deny_quarkus_versions")
     public List<String> getDenyQuarkusVersions() {
         return denyQuarkusVersions;
     }
@@ -58,7 +66,6 @@ public class RemoteConfig implements AnalyticsRemoteConfig, Serializable {
         this.denyQuarkusVersions = denyQuarkusVersions;
     }
 
-    @JsonProperty("refresh_interval")
     public Duration getRefreshInterval() {
         return refreshInterval;
     }
@@ -122,5 +129,76 @@ public class RemoteConfig implements AnalyticsRemoteConfig, Serializable {
             return "RemoteConfig.RemoteConfigBuilder(active=" + this.active + ", denyUserIds=" + this.denyUserIds +
                     ", denyQuarkusVersions=" + this.denyQuarkusVersions + ", refreshInterval=" + this.refreshInterval + ")";
         }
+    }
+
+    @Override
+    public String toJson() {
+        StringBuilder sb = new StringBuilder();
+        try {
+            Json.JsonObjectBuilder builder = Json.object()
+                    .put("active", active);
+            if (denyAnonymousIds != null) {
+                Json.JsonArrayBuilder arr = Json.array();
+                for (String id : denyAnonymousIds) {
+                    arr.add(id);
+                }
+                builder.put("deny_anonymous_ids", arr);
+            }
+            if (denyQuarkusVersions != null) {
+                Json.JsonArrayBuilder arr = Json.array();
+                for (String v : denyQuarkusVersions) {
+                    arr.add(v);
+                }
+                builder.put("deny_quarkus_versions", arr);
+            }
+            if (refreshInterval != null) {
+                builder.put("refresh_interval", refreshInterval.toString());
+            }
+            builder.appendTo(sb);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        return sb.toString();
+    }
+
+    public static RemoteConfig fromJson(JsonObject json) {
+        RemoteConfig config = new RemoteConfig();
+        JsonBoolean activeValue = json.get("active");
+        config.setActive(activeValue != null && activeValue.value());
+
+        JsonArray denyIdsArray = json.get("deny_anonymous_ids");
+        if (denyIdsArray != null) {
+            List<String> ids = new ArrayList<>();
+            for (JsonValue v : denyIdsArray.value()) {
+                if (v instanceof JsonString s) {
+                    ids.add(s.value());
+                }
+            }
+            config.setDenyAnonymousIds(ids);
+        }
+
+        JsonArray denyVersionsArray = json.get("deny_quarkus_versions");
+        if (denyVersionsArray != null) {
+            List<String> versions = new ArrayList<>();
+            for (JsonValue v : denyVersionsArray.value()) {
+                if (v instanceof JsonString s) {
+                    versions.add(s.value());
+                }
+            }
+            config.setDenyQuarkusVersions(versions);
+        }
+
+        JsonValue intervalValue = json.get("refresh_interval");
+        if (intervalValue != null) {
+            if (intervalValue instanceof JsonString s) {
+                config.setRefreshInterval(Duration.parse(s.value()));
+            } else if (intervalValue instanceof JsonDouble d) {
+                config.setRefreshInterval(Duration.ofSeconds((long) d.value()));
+            } else if (intervalValue instanceof JsonInteger i) {
+                config.setRefreshInterval(Duration.ofSeconds(i.longValue()));
+            }
+        }
+
+        return config;
     }
 }

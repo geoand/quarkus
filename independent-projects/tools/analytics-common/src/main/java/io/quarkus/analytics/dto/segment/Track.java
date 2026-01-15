@@ -1,13 +1,16 @@
 package io.quarkus.analytics.dto.segment;
 
+import java.io.IOException;
 import java.io.Serializable;
 import java.time.Instant;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.Map;
 
-import com.fasterxml.jackson.annotation.JsonFormat;
-import com.fasterxml.jackson.annotation.JsonProperty;
+import io.quarkus.analytics.util.FileUtils.JsonSerializable;
+import io.quarkus.bootstrap.json.Json;
 
-public class Track implements Serializable {
+public class Track implements Serializable, JsonSerializable {
     private String userId;
     private TrackEventType event;
     private TrackProperties properties;
@@ -34,7 +37,6 @@ public class Track implements Serializable {
         return userId;
     }
 
-    @JsonProperty("userId")
     public void setUserId(String userId) {
         this.userId = userId;
     }
@@ -63,7 +65,6 @@ public class Track implements Serializable {
         this.context = context;
     }
 
-    @JsonFormat(shape = JsonFormat.Shape.STRING)
     public Instant getTimestamp() {
         return timestamp;
     }
@@ -121,5 +122,66 @@ public class Track implements Serializable {
     public static class EventPropertyNames {
         public static final String BUILD_DIAGNOSTICS = "build_diagnostics";
         public static final String APP_EXTENSIONS = "app_extensions";
+    }
+
+    @Override
+    public String toJson() {
+        StringBuilder sb = new StringBuilder();
+        try {
+            Json.JsonObjectBuilder builder = Json.object()
+                    .put("userId", userId);
+            if (event != null) {
+                builder.put("event", event.name());
+            }
+            if (properties != null) {
+                builder.put("properties", properties.toJsonObjectBuilder());
+            }
+            if (context != null) {
+                builder.put("context", mapToJsonObjectBuilder(context));
+            }
+            if (timestamp != null) {
+                builder.put("timestamp", DateTimeFormatter.ISO_INSTANT.format(timestamp));
+            }
+            builder.appendTo(sb);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        return sb.toString();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Json.JsonObjectBuilder mapToJsonObjectBuilder(Map<String, Object> map) {
+        Json.JsonObjectBuilder builder = Json.object();
+        for (Map.Entry<String, Object> entry : map.entrySet()) {
+            Object value = entry.getValue();
+            if (value instanceof String s) {
+                builder.put(entry.getKey(), s);
+            } else if (value instanceof Boolean b) {
+                builder.put(entry.getKey(), b);
+            } else if (value instanceof Integer i) {
+                builder.put(entry.getKey(), i);
+            } else if (value instanceof Long l) {
+                builder.put(entry.getKey(), l);
+            } else if (value instanceof Map<?, ?>) {
+                builder.put(entry.getKey(), mapToJsonObjectBuilder((Map<String, Object>) value));
+            } else if (value instanceof List<?> list) {
+                Json.JsonArrayBuilder arr = Json.array();
+                for (Object item : list) {
+                    if (item instanceof String s) {
+                        arr.add(s);
+                    } else if (item instanceof Boolean b) {
+                        arr.add(b);
+                    } else if (item instanceof Integer i) {
+                        arr.add(i);
+                    } else if (item instanceof Long l) {
+                        arr.add(l);
+                    } else if (item instanceof Map<?, ?>) {
+                        arr.add(mapToJsonObjectBuilder((Map<String, Object>) item));
+                    }
+                }
+                builder.put(entry.getKey(), arr);
+            }
+        }
+        return builder;
     }
 }

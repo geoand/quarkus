@@ -247,7 +247,9 @@ public class ConfigService {
             if (!Files.exists(remoteConfigFile)) {
                 FileUtils.createFileAndParent(remoteConfigFile);
             }
-            FileUtils.write(config, remoteConfigFile);
+            if (config instanceof FileUtils.JsonSerializable) {
+                FileUtils.write((FileUtils.JsonSerializable) config, remoteConfigFile);
+            }
             return config;
         } catch (IOException e) {
             log.warn("[Quarkus build analytics] Failed to save remote config file. Analytics will be skipped. Exception: "

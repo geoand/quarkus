@@ -3,7 +3,7 @@ package io.quarkus.analytics.dto.segment;
 import java.io.Serializable;
 import java.util.List;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
+import io.quarkus.bootstrap.json.Json;
 
 public class TrackProperties implements Serializable {
     private List<AppExtension> appExtensions;
@@ -19,7 +19,6 @@ public class TrackProperties implements Serializable {
         return new TrackPropertiesBuilder();
     }
 
-    @JsonProperty("app_extensions")
     public List<AppExtension> getAppExtensions() {
         return appExtensions;
     }
@@ -48,6 +47,18 @@ public class TrackProperties implements Serializable {
         }
     }
 
+    public Json.JsonObjectBuilder toJsonObjectBuilder() {
+        Json.JsonObjectBuilder builder = Json.object();
+        if (appExtensions != null) {
+            Json.JsonArrayBuilder arr = Json.array();
+            for (AppExtension ext : appExtensions) {
+                arr.add(ext.toJsonObjectBuilder());
+            }
+            builder.put("app_extensions", arr);
+        }
+        return builder;
+    }
+
     public static class AppExtension {
         private String groupId;
         private String artifactId;
@@ -66,7 +77,6 @@ public class TrackProperties implements Serializable {
             return new AppExtensionBuilder();
         }
 
-        @JsonProperty("group_id")
         public String getGroupId() {
             return groupId;
         }
@@ -75,7 +85,6 @@ public class TrackProperties implements Serializable {
             this.groupId = groupId;
         }
 
-        @JsonProperty("artifact_id")
         public String getArtifactId() {
             return artifactId;
         }
@@ -123,6 +132,13 @@ public class TrackProperties implements Serializable {
                 return "TrackProperty.AppExtension.AppExtensionBuilder(groupId=" + this.groupId +
                         ", artifactId=" + this.artifactId + ", version=" + this.version + ")";
             }
+        }
+
+        public Json.JsonObjectBuilder toJsonObjectBuilder() {
+            return Json.object()
+                    .put("group_id", groupId)
+                    .put("artifact_id", artifactId)
+                    .put("version", version);
         }
     }
 }

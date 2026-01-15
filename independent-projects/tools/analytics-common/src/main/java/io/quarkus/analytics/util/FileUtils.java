@@ -1,15 +1,15 @@
 package io.quarkus.analytics.util;
 
-import static io.quarkus.analytics.util.StringUtils.getObjectMapper;
-
 import java.io.IOException;
 import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Optional;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-
+import io.quarkus.analytics.dto.config.LocalConfig;
+import io.quarkus.analytics.dto.config.RemoteConfig;
+import io.quarkus.bootstrap.json.JsonObject;
+import io.quarkus.bootstrap.json.JsonReader;
 import io.quarkus.devtools.messagewriter.MessageWriter;
 
 public class FileUtils {
@@ -49,12 +49,13 @@ public class FileUtils {
      *
      * @param content
      * @param path
-     * @param <T>
      * @throws IOException
      */
-    public static <T> void write(T content, Path path) throws IOException {
-        final ObjectMapper mapper = getObjectMapper();
-        mapper.writeValue(path.toFile(), content);
+    public static void write(JsonSerializable content, Path path) throws IOException {
+        createFileAndParent(path);
+        try (Writer writer = Files.newBufferedWriter(path)) {
+            writer.write(content.toJson());
+        }
     }
 
     /**
@@ -62,22 +63,23 @@ public class FileUtils {
      *
      * @param content
      * @param path
-     * @param <T>
      * @throws IOException
      */
-    public static <T> void overwrite(T content, Path path) throws IOException {
+    public static void overwrite(JsonSerializable content, Path path) throws IOException {
         if (Files.exists(path)) {
             Files.delete(path);
         }
         createFileAndParent(path);
-        final ObjectMapper mapper = getObjectMapper();
-        mapper.writeValue(path.toFile(), content);
+        try (Writer writer = Files.newBufferedWriter(path)) {
+            writer.write(content.toJson());
+        }
     }
 
     public static <T> Optional<T> read(Class<T> clazz, Path path, MessageWriter log) throws IOException {
         try {
-            final ObjectMapper mapper = getObjectMapper();
-            return Optional.of(mapper.readValue(path.toFile(), clazz));
+            String jsonContent = Files.readString(path);
+            JsonObject jsonObject = JsonReader.of(jsonContent).read();
+            return Optional.of(deserialize(clazz, jsonObject));
         } catch (Exception e) {
             log.warn("[Quarkus build analytics] Could not read {}", path.toString(), e);
             return Optional.empty();
@@ -88,5 +90,22 @@ public class FileUtils {
                     ". Attempting to continue...");
             return Optional.empty();
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <T> T deserialize(Class<T> clazz, JsonObject jsonObject) {
+        if (clazz == LocalConfig.class) {
+            return (T) LocalConfig.fromJson(jsonObject);
+        } else if (clazz == RemoteConfig.class) {
+            return (T) RemoteConfig.fromJson(jsonObject);
+        }
+        throw new IllegalArgumentException("Unsupported class: " + clazz.getName());
+    }
+
+    /**
+     * Interface for objects that can be serialized to JSON.
+     */
+    public interface JsonSerializable {
+        String toJson();
     }
 }
