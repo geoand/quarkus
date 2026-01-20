@@ -83,6 +83,7 @@ import io.quarkus.registry.ValueRegistry;
 import io.quarkus.runtime.Application;
 import io.quarkus.runtime.ExecutionModeManager;
 import io.quarkus.runtime.LaunchMode;
+import io.quarkus.runtime.MemoryProtocolProvider;
 import io.quarkus.runtime.NativeImageRuntimePropertiesRecorder;
 import io.quarkus.runtime.PreventFurtherStepsException;
 import io.quarkus.runtime.Quarkus;
@@ -173,6 +174,9 @@ public class MainClassBuildStep {
 
         MethodCreator mv = file.getMethodCreator("<clinit>", void.class);
         mv.setModifiers(Modifier.PUBLIC | Modifier.STATIC);
+
+        mv.invokeStaticMethod(ofMethod(MemoryProtocolProvider.class, "tryInjectIntoCL", void.class));
+
         if (!namingConfig.enableJndi() && allowJNDIBuildItems.isEmpty()) {
             mv.invokeStaticMethod(ofMethod(DisabledInitialContextManager.class, "register", void.class));
         }
