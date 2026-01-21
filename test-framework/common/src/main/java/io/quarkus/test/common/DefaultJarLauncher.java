@@ -114,7 +114,11 @@ public class DefaultJarLauncher implements JarArtifactLauncher {
             args.addAll(argLine);
         }
         if (generateAotFile) {
-            args.add("-XX:AOTCacheOutput=%s".formatted(jarPath.resolveSibling("app.aot")));
+            if (isSemeru()) {
+                args.add("-Xshareclasses:name=quarkus,cacheDir=%s,disableBCI".formatted(jarPath.getParent()));
+            } else {
+                args.add("-XX:AOTCacheOutput=%s".formatted(jarPath.resolveSibling("app.aot")));
+            }
         }
         if (HTTP_PRESENT) {
             args.add("-Dquarkus.http.port=" + httpPort);
@@ -171,6 +175,13 @@ public class DefaultJarLauncher implements JarArtifactLauncher {
 
         // just assume 'java' is on the system path
         return "java";
+    }
+
+    private boolean isSemeru() {
+        String vendor = System.getProperty("java.vendor");
+        String vmName = System.getProperty("java.vm.name");
+
+        return vendor.contains("IBM") || vmName.contains("OpenJ9");
     }
 
     @Override
