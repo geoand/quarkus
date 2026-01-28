@@ -331,7 +331,8 @@ public class QuarkusIntegrationTestExtension extends AbstractQuarkusTestWithCont
 
             Closeable resource = new IntegrationTestExtensionStateResource(launcher,
                     devServicesLaunchResult.getCuratedApplication());
-            IntegrationTestExtensionState state = new IntegrationTestExtensionState(valueRegistry, testResourceManager,
+            IntegrationTestExtensionState state = new IntegrationTestExtensionState(requiredTestClass, valueRegistry,
+                    testResourceManager,
                     resource, AbstractTestWithCallbacksExtension::clearCallbacks, listeningAddress, sysPropRestore);
             testHttpEndpointProviders = TestHttpEndpointProvider.load();
 
