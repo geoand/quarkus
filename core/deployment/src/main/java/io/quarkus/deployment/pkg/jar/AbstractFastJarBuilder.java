@@ -268,7 +268,7 @@ abstract class AbstractFastJarBuilder extends AbstractJarBuilder<JarBuildItem> {
                 .setPath(initJar)
                 .setDependencies(List.of(curateOutcome.getApplicationModel().getAppArtifact())))
                 .setRunnerPath(initJar);
-        boolean mutableJar = packageConfig.jar().type() == MUTABLE_JAR;
+        boolean mutableJar = packageConfig.jar().resolvedType() == MUTABLE_JAR;
         if (mutableJar) {
             //we output the properties in a reproducible manner, so we remove the date comment
             //and sort them
@@ -366,7 +366,7 @@ abstract class AbstractFastJarBuilder extends AbstractJarBuilder<JarBuildItem> {
                 }
             });
         }
-        return new JarBuildItem(initJar, null, libDir, packageConfig.jar().type(), null, manifestConfig.build());
+        return new JarBuildItem(initJar, null, libDir, packageConfig.jar().resolvedType(), null, manifestConfig.build());
     }
 
     protected abstract void writeSerializedApplication(OutputStream out, Path buildDir, List<Path> allJars,

@@ -116,7 +116,7 @@ public class JarResultBuildStep {
         Set<ArtifactKey> removedArtifactKeys = getRemovedArtifactKeys(classLoadingConfig);
         Set<ArtifactKey> parentFirstArtifactKeys = getParentFirstArtifactKeys(curateOutcomeBuildItem, classLoadingConfig);
 
-        return switch (packageConfig.jar().type()) {
+        return switch (packageConfig.jar().resolvedType()) {
             case UBER_JAR -> new UberJarBuilder(curateOutcomeBuildItem,
                     outputTargetBuildItem,
                     applicationInfo,

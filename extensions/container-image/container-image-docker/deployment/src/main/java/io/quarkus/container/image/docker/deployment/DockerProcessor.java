@@ -63,11 +63,10 @@ public class DockerProcessor extends CommonProcessor<DockerConfig> {
             BuildProducer<ArtifactResultBuildItem> artifactResultProducer,
             BuildProducer<ContainerImageBuilderBuildItem> containerImageBuilder,
             PackageConfig packageConfig,
-            @SuppressWarnings("unused") JarBuildItem jar// used to ensure that the jar has been built
-    ) {
+            JarBuildItem jar) {
 
         buildFromJar(dockerConfig, dockerStatusBuildItem, containerImageConfig, out, containerImageInfo,
-                buildRequest, pushRequest, artifactResultProducer, containerImageBuilder, packageConfig,
+                buildRequest, pushRequest, artifactResultProducer, containerImageBuilder, packageConfig, jar,
                 ContainerRuntime.DOCKER, ContainerRuntime.PODMAN);
     }
 
@@ -87,8 +86,8 @@ public class DockerProcessor extends CommonProcessor<DockerConfig> {
             NativeImageBuildItem nativeImage) {
 
         buildFromNativeImage(dockerConfig, dockerStatusBuildItem, containerImageConfig, containerImage,
-                buildRequest, pushRequest, out, artifactResultProducer, containerImageBuilder, packageConfig, nativeImage,
-                ContainerRuntime.DOCKER, ContainerRuntime.PODMAN);
+                buildRequest, pushRequest, out, artifactResultProducer, containerImageBuilder, packageConfig,
+                nativeImage, ContainerRuntime.DOCKER, ContainerRuntime.PODMAN);
     }
 
     @Override

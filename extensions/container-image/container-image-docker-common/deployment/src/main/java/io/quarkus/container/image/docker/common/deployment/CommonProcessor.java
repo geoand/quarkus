@@ -32,6 +32,7 @@ import io.quarkus.deployment.builditem.ContainerRuntimeStatusBuildItem;
 import io.quarkus.deployment.pkg.PackageConfig;
 import io.quarkus.deployment.pkg.PackageConfig.JarConfig.JarType;
 import io.quarkus.deployment.pkg.builditem.ArtifactResultBuildItem;
+import io.quarkus.deployment.pkg.builditem.JarBuildItem;
 import io.quarkus.deployment.pkg.builditem.NativeImageBuildItem;
 import io.quarkus.deployment.pkg.builditem.OutputTargetBuildItem;
 import io.quarkus.deployment.util.ContainerRuntimeUtil.ContainerRuntime;
@@ -61,6 +62,7 @@ public abstract class CommonProcessor<C extends CommonConfig> {
             BuildProducer<ArtifactResultBuildItem> artifactResultProducer,
             BuildProducer<ContainerImageBuilderBuildItem> containerImageBuilder,
             PackageConfig packageConfig,
+            JarBuildItem jar,
             ContainerRuntime... containerRuntimes) {
 
         var buildContainerImage = buildContainerImageNeeded(containerImageConfig, buildRequest);
@@ -73,7 +75,7 @@ public abstract class CommonProcessor<C extends CommonConfig> {
                                 .formatted(getProcessorImplementation()));
             }
 
-            var dockerfilePaths = getDockerfilePaths(config, false, packageConfig, out);
+            var dockerfilePaths = getDockerfilePaths(config, false, jar.getType(), out);
             var dockerfileBaseInformation = DockerFileBaseInformationProvider.impl()
                     .determine(dockerfilePaths.dockerfilePath());
 
@@ -220,7 +222,7 @@ public abstract class CommonProcessor<C extends CommonConfig> {
             }
 
             var executableName = getExecutableName(config, containerRuntimes);
-            var dockerfilePaths = getDockerfilePaths(config, true, packageConfig, out);
+            var dockerfilePaths = getDockerfilePaths(config, true, null, out);
             var builtContainerImage = createContainerImage(containerImageConfig, config, containerImage, out, dockerfilePaths,
                     buildContainerImage, pushContainerImage, packageConfig, executableName);
 
@@ -349,7 +351,7 @@ public abstract class CommonProcessor<C extends CommonConfig> {
 
     private DockerfilePaths getDockerfilePaths(C config,
             boolean forNative,
-            PackageConfig packageConfig,
+            JarType jarType,
             OutputTargetBuildItem out) {
 
         var outputDirectory = out.getOutputDirectory();
@@ -361,7 +363,7 @@ public abstract class CommonProcessor<C extends CommonConfig> {
         } else {
             return config.dockerfileJvmPath()
                     .map(dockerfileJvmPath -> ProvidedDockerfile.get(Paths.get(dockerfileJvmPath), outputDirectory))
-                    .orElseGet(() -> (packageConfig.jar().type() == JarType.LEGACY_JAR)
+                    .orElseGet(() -> (jarType == JarType.LEGACY_JAR)
                             ? DockerfileDetectionResult.detect(DOCKERFILE_LEGACY_JAR, outputDirectory)
                             : DockerfileDetectionResult.detect(DOCKERFILE_JVM, outputDirectory));
         }

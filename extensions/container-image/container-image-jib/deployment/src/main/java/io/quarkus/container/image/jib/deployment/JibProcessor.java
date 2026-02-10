@@ -176,8 +176,7 @@ public class JibProcessor {
         }
 
         JibContainerBuilder jibContainerBuilder;
-        PackageConfig.JarConfig.JarType jarType = packageConfig.jar().type();
-        jibContainerBuilder = switch (jarType) {
+        jibContainerBuilder = switch (sourceJar.getType()) {
             case LEGACY_JAR, UBER_JAR ->
                 createContainerBuilderFromLegacyJar(determineBaseJvmImage(jibConfig, compiledJavaVersion),
                         jibConfig, containerImageConfig,
@@ -186,7 +185,7 @@ public class JibProcessor {
                 createContainerBuilderFromFastJar(determineBaseJvmImage(jibConfig, compiledJavaVersion),
                         jibConfig, containerImageConfig, sourceJar, curateOutcome,
                         containerImageLabels,
-                        jvmStartupOptimizerArchiveResult, jarType == MUTABLE_JAR);
+                        jvmStartupOptimizerArchiveResult, sourceJar.getType() == MUTABLE_JAR);
         };
         setUser(jibConfig, jibContainerBuilder);
         setPlatforms(jibConfig, jibContainerBuilder);

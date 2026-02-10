@@ -278,12 +278,11 @@ public class OpenshiftProcessor {
             //For docker kind of builds where we use instructions like: `COPY target/*.jar /deployments` it using '/target' is a requirement.
             //For s2i kind of builds where jars are expected directly in the '/' we have to use null.
             String outputDirName = out.getOutputDirectory().getFileName().toString();
-            PackageConfig.JarConfig.JarType jarType = packageConfig.jar().type();
-            String contextRoot = getContextRoot(outputDirName, jarType.usesFastJarLayout(),
+            String contextRoot = getContextRoot(outputDirName, jar.getType().usesFastJarLayout(),
                     config.buildStrategy());
             KubernetesClientBuilder clientBuilder = newClientBuilderWithoutHttp2(kubernetesClient.getConfiguration(),
                     kubernetesClientBuilder.getHttpClientFactory());
-            if (jarType.usesFastJarLayout()) {
+            if (jar.getType().usesFastJarLayout()) {
                 createContainerImage(clientBuilder, openshiftYml.get(), config, contextRoot, jar.getPath().getParent(),
                         jar.getPath().getParent());
             } else if (jar.getLibraryDir() != null) { //When using uber-jar the libraryDir is going to be null, potentially causing NPE.

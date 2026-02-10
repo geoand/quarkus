@@ -13,6 +13,7 @@ import io.quarkus.deployment.annotations.BuildProducer;
 import io.quarkus.deployment.annotations.BuildStep;
 import io.quarkus.deployment.pkg.PackageConfig;
 import io.quarkus.deployment.pkg.builditem.BuildSystemTargetBuildItem;
+import io.quarkus.deployment.pkg.builditem.JarBuildItem;
 import io.quarkus.deployment.pkg.builditem.OutputTargetBuildItem;
 
 public class RunCommandProcessor {
@@ -27,17 +28,18 @@ public class RunCommandProcessor {
     @SuppressWarnings("deprecation") // legacy jar
     @BuildStep
     public void defaultJavaCommand(PackageConfig packageConfig,
-            OutputTargetBuildItem jar,
+            JarBuildItem jarBuildItem,
+            OutputTargetBuildItem outputTarget,
             BuildProducer<RunCommandActionBuildItem> cmds,
             BuildSystemTargetBuildItem buildSystemTarget) {
 
-        Path jarPath = switch (packageConfig.jar().type()) {
-            case UBER_JAR -> jar.getOutputDirectory()
-                    .resolve(jar.getBaseName() + packageConfig.computedRunnerSuffix() + ".jar");
+        Path jarPath = switch (jarBuildItem.getType()) {
+            case UBER_JAR -> outputTarget.getOutputDirectory()
+                    .resolve(outputTarget.getBaseName() + packageConfig.computedRunnerSuffix() + ".jar");
             // todo: legacy JAR should be using runnerSuffix()
-            case LEGACY_JAR -> jar.getOutputDirectory()
-                    .resolve(jar.getBaseName() + packageConfig.computedRunnerSuffix() + ".jar");
-            case FAST_JAR, MUTABLE_JAR, AOT_JAR -> jar.getOutputDirectory()
+            case LEGACY_JAR -> outputTarget.getOutputDirectory()
+                    .resolve(outputTarget.getBaseName() + packageConfig.computedRunnerSuffix() + ".jar");
+            case FAST_JAR, MUTABLE_JAR, AOT_JAR -> outputTarget.getOutputDirectory()
                     .resolve(DEFAULT_FAST_JAR_DIRECTORY_NAME).resolve(QUARKUS_RUN_JAR);
         };
 
