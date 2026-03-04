@@ -1604,6 +1604,16 @@
             </dependency>
             <dependency>
                 <groupId>io.quarkus</groupId>
+                <artifactId>quarkus-bean-validator</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.quarkus</groupId>
+                <artifactId>quarkus-bean-validator-deployment</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.quarkus</groupId>
                 <artifactId>quarkus-hibernate-validator</artifactId>
                 <version>${project.version}</version>
             </dependency>
@@ -5105,6 +5115,16 @@
             <dependency>
                 <groupId>io.quarkus.arc</groupId>
                 <artifactId>arc</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.quarkus.bean-validation</groupId>
+                <artifactId>bean-validation</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.quarkus.bean-validation</groupId>
+                <artifactId>bean-validation-processor</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

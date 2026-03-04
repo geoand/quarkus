@@ -99,6 +99,7 @@
         <module>hibernate-orm</module>
         <module>hibernate-envers</module>
         <module>hibernate-reactive</module>
+        <module>bean-validator</module>
         <module>hibernate-validator</module>
         <module>panache</module>
         <module>hibernate-search-backend-elasticsearch-common</module>

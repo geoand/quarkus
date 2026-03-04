@@ -1,0 +1,140 @@
+<!DOCTYPE suite SYSTEM "http://testng.org/testng-1.0.dtd">
+<suite name="Bean Validation TCK">
+
+    <test name="Bean Validation TCK">
+        <!-- List only the packages we support; metadata, xmlconfiguration, and
+             integration packages are intentionally omitted (not supported). -->
+        <packages>
+            <package name="org.hibernate.beanvalidation.tck.tests.bootstrap.*"/>
+            <package name="org.hibernate.beanvalidation.tck.tests.constraints.*"/>
+            <package name="org.hibernate.beanvalidation.tck.tests.messageinterpolation.*"/>
+            <package name="org.hibernate.beanvalidation.tck.tests.methodvalidation.*"/>
+            <package name="org.hibernate.beanvalidation.tck.tests.time.*"/>
+            <package name="org.hibernate.beanvalidation.tck.tests.traversableresolver.*"/>
+            <package name="org.hibernate.beanvalidation.tck.tests.validation.*"/>
+            <package name="org.hibernate.beanvalidation.tck.tests.validatorfactory.*"/>
+            <package name="org.hibernate.beanvalidation.tck.tests.valueextraction.*"/>
+        </packages>
+
+        <classes>
+            <!-- === EL message interpolation: not supported === -->
+            <class name="org.hibernate.beanvalidation.tck.tests.messageinterpolation.ExpressionLanguageMessageInterpolationTest">
+                <methods><exclude name=".*"/></methods>
+            </class>
+            <class name="org.hibernate.beanvalidation.tck.tests.messageinterpolation.MessageInterpolationTest">
+                <methods><exclude name="testElExpressionsAreInterpolated"/></methods>
+            </class>
+
+            <!-- === Bootstrap tests that depend on validation.xml === -->
+            <class name="org.hibernate.beanvalidation.tck.tests.bootstrap.BootstrapConfigurationTest">
+                <methods><exclude name=".*"/></methods>
+            </class>
+            <class name="org.hibernate.beanvalidation.tck.tests.bootstrap.BootstrapConfigurationWithEmptyValidatedExecutableTypesTest">
+                <methods><exclude name=".*"/></methods>
+            </class>
+            <class name="org.hibernate.beanvalidation.tck.tests.bootstrap.BootstrapConfigurationWithValidatedExecutableTypesContainingALLTest">
+                <methods><exclude name=".*"/></methods>
+            </class>
+            <class name="org.hibernate.beanvalidation.tck.tests.bootstrap.BootstrapConfigurationWithValidatedExecutableTypesContainingALLAndNONETest">
+                <methods><exclude name=".*"/></methods>
+            </class>
+            <class name="org.hibernate.beanvalidation.tck.tests.bootstrap.BootstrapConfigurationWithValidatedExecutableTypesContainingNONETest">
+                <methods><exclude name=".*"/></methods>
+            </class>
+            <class name="org.hibernate.beanvalidation.tck.tests.bootstrap.BootstrapConfigurationWithoutValidationXmlTest">
+                <methods><exclude name=".*"/></methods>
+            </class>
+            <class name="org.hibernate.beanvalidation.tck.tests.bootstrap.customprovider.BootstrapCustomProviderDefinedInValidationXmlTest">
+                <methods><exclude name=".*"/></methods>
+            </class>
+            <class name="org.hibernate.beanvalidation.tck.tests.bootstrap.customprovider.BootstrapNonAvailableValidationProviderTest">
+                <methods><exclude name="testUnknownProviderConfiguredInValidationXml"/></methods>
+            </class>
+
+            <!-- === Constraint metadata API: not supported === -->
+            <class name="org.hibernate.beanvalidation.tck.tests.constraints.inheritance.ConstraintInheritanceTest">
+                <methods><exclude name=".*"/></methods>
+            </class>
+
+            <!-- === XML mapping tests === -->
+            <class name="org.hibernate.beanvalidation.tck.tests.bootstrap.ConfigurationTest">
+                <methods>
+                    <exclude name="testMappingsCanBeAddedViaConfiguration"/>
+                    <exclude name="testNonResettableInputStreamCanBeAddedViaConfigurationAndFactoryCanBeCreatedSeveralTimes"/>
+                    <exclude name="testSeveralFactoriesCanBeBuildFromOneConfiguration"/>
+                </methods>
+            </class>
+
+            <!-- === XML override of built-in validators === -->
+            <class name="org.hibernate.beanvalidation.tck.tests.constraints.builtinconstraints.BuiltinValidatorOverrideTest">
+                <methods><exclude name=".*"/></methods>
+            </class>
+
+            <!-- === XML-dependent executable validation settings === -->
+            <class name="org.hibernate.beanvalidation.tck.tests.methodvalidation.ExecutableValidationIgnoresValidatedExecutableXmlSettingsTest">
+                <methods><exclude name=".*"/></methods>
+            </class>
+
+            <!-- === XML-dependent value extraction tests === -->
+            <class name="org.hibernate.beanvalidation.tck.tests.valueextraction.declaration.MultipleValueExtractorsInValidationXmlForSameTypeAndTypeArgumentTest">
+                <methods><exclude name=".*"/></methods>
+            </class>
+            <class name="org.hibernate.beanvalidation.tck.tests.valueextraction.declaration.ValueExtractorDeclaredInValidationXmlTest">
+                <methods><exclude name=".*"/></methods>
+            </class>
+            <class name="org.hibernate.beanvalidation.tck.tests.valueextraction.declaration.ValueExtractorWithNoPublicNoArgConstructorInValidationXmlTest">
+                <methods><exclude name=".*"/></methods>
+            </class>
+
+            <!-- === Custom ValueExtractor API: not supported === -->
+            <class name="org.hibernate.beanvalidation.tck.tests.valueextraction.declaration.MultipleValueExtractorsDeclaredProgrammaticallyForSameTypeAndTypeArgumentTest">
+                <methods><exclude name=".*"/></methods>
+            </class>
+            <class name="org.hibernate.beanvalidation.tck.tests.valueextraction.declaration.ValueExtractorDefinedInConfigurationApiTest">
+                <methods><exclude name=".*"/></methods>
+            </class>
+            <class name="org.hibernate.beanvalidation.tck.tests.valueextraction.declaration.ValueExtractorFromServiceLoaderTest">
+                <methods><exclude name=".*"/></methods>
+            </class>
+            <class name="org.hibernate.beanvalidation.tck.tests.valueextraction.declaration.ValueExtractorsPrecedenceTest">
+                <methods><exclude name=".*"/></methods>
+            </class>
+            <class name="org.hibernate.beanvalidation.tck.tests.valueextraction.definition.InvalidValueExtractorTest">
+                <methods><exclude name=".*"/></methods>
+            </class>
+            <class name="org.hibernate.beanvalidation.tck.tests.valueextraction.definition.ValueExtractorDefinitionTest">
+                <methods><exclude name=".*"/></methods>
+            </class>
+            <class name="org.hibernate.beanvalidation.tck.tests.valueextraction.resolution.CascadingValueExtractorResolutionAlgorithmTest">
+                <methods><exclude name=".*"/></methods>
+            </class>
+            <class name="org.hibernate.beanvalidation.tck.tests.valueextraction.resolution.ContainerElementValueExtractorResolutionAlgorithmTest">
+                <methods><exclude name=".*"/></methods>
+            </class>
+            <class name="org.hibernate.beanvalidation.tck.tests.valueextraction.runtime.ValueExtractorExceptionWrapping">
+                <methods><exclude name=".*"/></methods>
+            </class>
+            <class name="org.hibernate.beanvalidation.tck.tests.valueextraction.unwrapping.ValueExtractionUnwrappingTest">
+                <methods><exclude name=".*"/></methods>
+            </class>
+
+            <!-- === Custom container value extraction: not supported === -->
+            <class name="org.hibernate.beanvalidation.tck.tests.constraints.containerelement.ContainerElementConstraintCustomContainerTest">
+                <methods><exclude name=".*"/></methods>
+            </class>
+
+            <!-- === Tests using custom ValueExtractor via addValueExtractor() API === -->
+            <class name="org.hibernate.beanvalidation.tck.tests.validation.graphnavigation.containerelement.NestedCascadingOnContainerElementsTest">
+                <methods><exclude name="testMultipleNestedValidWithCustomExtractor"/></methods>
+            </class>
+            <class name="org.hibernate.beanvalidation.tck.tests.constraints.validatorresolution.ValidatorResolutionTest">
+                <methods><exclude name="testTargetedTypeIsTypeArgumentForNonGenericContainerWithValueExtractorWithExtractedType"/></methods>
+            </class>
+
+            <!-- === JavaFX: not available in Quarkus === -->
+            <class name="org.hibernate.beanvalidation.tck.tests.valueextraction.builtin.JavaFXValueExtractorsTest">
+                <methods><exclude name=".*"/></methods>
+            </class>
+        </classes>
+    </test>
+</suite>

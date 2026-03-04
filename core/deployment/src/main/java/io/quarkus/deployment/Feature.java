@@ -15,6 +15,7 @@ public enum Feature {
     APICURIO_REGISTRY_AVRO,
     APICURIO_REGISTRY_JSON_SCHEMA,
     AWT,
+    BEAN_VALIDATOR,
     CACHE,
     CDI,
     COMPOSE,

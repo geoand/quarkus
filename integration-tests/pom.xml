@@ -174,6 +174,7 @@
                 <module>funqy-google-cloud-functions</module>
                 <module>class-transformer</module>
                 <module>shared-library</module>
+                <module>bean-validator</module>
                 <module>hibernate-validator</module>
                 <module>hibernate-validator-resteasy-reactive</module>
                 <module>common-jpa-entities</module>

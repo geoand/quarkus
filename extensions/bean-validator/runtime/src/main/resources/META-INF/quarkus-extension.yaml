@@ -1,0 +1,13 @@
+---
+artifact: ${project.groupId}:${project.artifactId}:${project.version}
+name: "Bean Validator"
+metadata:
+  short-name: "bean-validator"
+  keywords:
+  - "bean-validator"
+  - "bean-validation"
+  - "validation"
+  categories:
+  - "web"
+  - "data"
+  status: "experimental"
