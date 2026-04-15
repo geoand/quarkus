@@ -35,7 +35,6 @@ import static org.jboss.resteasy.reactive.common.processor.ResteasyReactiveDotNa
 import static org.jboss.resteasy.reactive.common.processor.ResteasyReactiveDotNames.MULTI;
 import static org.jboss.resteasy.reactive.common.processor.ResteasyReactiveDotNames.MULTI_PART_DATA_INPUT;
 import static org.jboss.resteasy.reactive.common.processor.ResteasyReactiveDotNames.MULTI_PART_FORM_PARAM;
-import static org.jboss.resteasy.reactive.common.processor.ResteasyReactiveDotNames.MULTI_VALUED_MAP;
 import static org.jboss.resteasy.reactive.common.processor.ResteasyReactiveDotNames.NON_BLOCKING;
 import static org.jboss.resteasy.reactive.common.processor.ResteasyReactiveDotNames.OBJECT;
 import static org.jboss.resteasy.reactive.common.processor.ResteasyReactiveDotNames.OFFSET_DATE_TIME;
@@ -707,7 +706,7 @@ public abstract class EndpointIndexer<T extends EndpointIndexer<T, PARAM, METHOD
                         + "It is strongly advised to define the generic type otherwise the behavior could be unpredictable",
                         currentMethodInfo, currentMethodInfo.declaringClass().name());
             }
-            Type nonAsyncReturnType = getNonAsyncReturnType(methodContextReturnTypeOrReturnType);
+            Type nonAsyncReturnType = getNonWrapperReturnType(methodContextReturnTypeOrReturnType);
             addWriterForType(additionalWriters, nonAsyncReturnType);
 
             String streamElementType = basicResourceClassInfo.getStreamElementType();
@@ -1028,7 +1027,7 @@ public abstract class EndpointIndexer<T extends EndpointIndexer<T, PARAM, METHOD
         return EMPTY_STRING_ARRAY;
     }
 
-    private Type getNonAsyncReturnType(Type returnType) {
+    public static Type getNonWrapperReturnType(Type returnType) {
         switch (returnType.kind()) {
             case ARRAY:
             case CLASS:

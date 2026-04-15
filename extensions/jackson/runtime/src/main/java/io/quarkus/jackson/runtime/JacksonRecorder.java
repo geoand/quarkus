@@ -67,6 +67,19 @@ public class JacksonRecorder {
         };
     }
 
+    /**
+     * Stores precomputed Jackson metadata in {@link PrecomputedMetadataCustomizer} so that
+     * the pre-registered CDI bean can pick it up when customizing the ObjectMapper.
+     * This avoids producing a {@code SyntheticBeanBuildItem} which would cause a build
+     * chain cycle with REST endpoint discovery.
+     *
+     * @param classToMetadata map of fully-qualified class name to class metadata
+     */
+    @StaticInit
+    public void setPrecomputedMetadata(Map<String, PrecomputedClassMetadata> classToMetadata) {
+        PrecomputedMetadataCustomizer.setMetadata(classToMetadata);
+    }
+
     @RuntimeInit
     public void clearCachesOnShutdown(ShutdownContext shutdownContext) {
         shutdownContext.addShutdownTask(new Runnable() {

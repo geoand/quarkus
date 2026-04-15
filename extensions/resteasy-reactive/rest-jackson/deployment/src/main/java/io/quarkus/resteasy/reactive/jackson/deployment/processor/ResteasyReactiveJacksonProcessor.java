@@ -34,9 +34,13 @@ import org.jboss.jandex.DotName;
 import org.jboss.jandex.FieldInfo;
 import org.jboss.jandex.IndexView;
 import org.jboss.jandex.MethodInfo;
+import org.jboss.jandex.ParameterizedType;
 import org.jboss.jandex.Type;
 import org.jboss.logging.Logger;
+import org.jboss.resteasy.reactive.common.model.MethodParameter;
+import org.jboss.resteasy.reactive.common.model.ParameterType;
 import org.jboss.resteasy.reactive.common.model.ResourceMethod;
+import org.jboss.resteasy.reactive.common.processor.EndpointIndexer;
 import org.jboss.resteasy.reactive.common.processor.ResteasyReactiveDotNames;
 import org.jboss.resteasy.reactive.server.util.MethodId;
 
@@ -63,6 +67,7 @@ import io.quarkus.deployment.builditem.GeneratedClassBuildItem;
 import io.quarkus.deployment.builditem.RuntimeConfigSetupCompleteBuildItem;
 import io.quarkus.deployment.builditem.ShutdownContextBuildItem;
 import io.quarkus.deployment.builditem.nativeimage.ReflectiveClassBuildItem;
+import io.quarkus.jackson.spi.PrecomputedJacksonTypeBuildItem;
 import io.quarkus.resteasy.reactive.common.deployment.JaxRsResourceIndexBuildItem;
 import io.quarkus.resteasy.reactive.common.deployment.QuarkusResteasyReactiveDotNames;
 import io.quarkus.resteasy.reactive.common.deployment.ResourceScanningResultBuildItem;
@@ -406,14 +411,14 @@ public class ResteasyReactiveJacksonProcessor {
 
         for (ResteasyReactiveResourceMethodEntriesBuildItem.Entry entry : resourceMethodEntries.getEntries()) {
             MethodInfo methodInfo = entry.getMethodInfo();
-            ClassInfo effectiveReturnClassInfo = getEffectiveClassInfo(methodInfo.returnType(), indexView);
+            ClassInfo effectiveReturnClassInfo = getSerializedClassInfo(methodInfo.returnType(), indexView);
             if (effectiveReturnClassInfo != null && !effectiveReturnClassInfo.isEnum()) {
                 serializedClasses.put(effectiveReturnClassInfo.name().toString(), effectiveReturnClassInfo);
             }
 
             if (methodInfo.hasAnnotation(POST.class)) {
                 for (Type paramType : methodInfo.parameterTypes()) {
-                    ClassInfo effectiveParamClassInfo = getEffectiveClassInfo(paramType, indexView);
+                    ClassInfo effectiveParamClassInfo = getSerializedClassInfo(paramType, indexView);
                     if (effectiveParamClassInfo != null) {
                         deserializedClasses.put(effectiveParamClassInfo.name().toString(), effectiveParamClassInfo);
                     }
@@ -434,6 +439,59 @@ public class ResteasyReactiveJacksonProcessor {
             factory.create(deserializedClasses.values())
                     .forEach(recorder::recordGeneratedDeserializer);
         }
+    }
+
+    @BuildStep
+    public void registerPrecomputedJacksonTypes(
+            ResteasyReactiveResourceMethodEntriesBuildItem resourceMethodEntries,
+            JaxRsResourceIndexBuildItem jaxRsIndex,
+            BuildProducer<PrecomputedJacksonTypeBuildItem> precomputedTypes) {
+
+        IndexView indexView = jaxRsIndex.getIndexView();
+        Map<String, ClassInfo> discoveredClasses = new HashMap<>();
+
+        for (ResteasyReactiveResourceMethodEntriesBuildItem.Entry entry : resourceMethodEntries.getEntries()) {
+            MethodInfo methodInfo = entry.getMethodInfo();
+
+            ClassInfo serializedClassInfo = getSerializedClassInfo(methodInfo.returnType(), indexView);
+            if (shouldBePrecomputed(serializedClassInfo)) {
+                discoveredClasses.putIfAbsent(serializedClassInfo.name().toString(), serializedClassInfo);
+            }
+
+            for (MethodParameter parameter : entry.getResourceMethod().getParameters()) {
+                if (parameter.getParameterType() == ParameterType.BODY) {
+                    ClassInfo clazz = indexView.getClassByName(parameter.type);
+                    if (shouldBePrecomputed(clazz)) {
+                        discoveredClasses.putIfAbsent(parameter.type, clazz);
+                    }
+                }
+            }
+        }
+
+        for (ClassInfo classInfo : discoveredClasses.values()) {
+            precomputedTypes.produce(new PrecomputedJacksonTypeBuildItem(classInfo));
+        }
+    }
+
+    private static boolean shouldBePrecomputed(ClassInfo serializedClassInfo) {
+        if (serializedClassInfo == null) {
+            return false;
+        }
+        if (serializedClassInfo.isEnum()) {
+            // TODO: can this be lifted?
+            return false;
+        }
+        DotName name = serializedClassInfo.name();
+        if (name.equals(ResteasyReactiveDotNames.SET) || name.equals(ResteasyReactiveDotNames.MAP)
+                || name.equals(ResteasyReactiveDotNames.LIST) || name.equals(ResteasyReactiveDotNames.COLLECTION)) {
+            // there is no need to precompute these types
+            return false;
+        }
+        if (name.equals(ResteasyReactiveDotNames.RESPONSE)) {
+            // this type does not carry any information about what is going to be serialized
+            return false;
+        }
+        return true;
     }
 
     @BuildStep(onlyIf = JacksonOptimizationConfig.IsReflectionFreeSerializersEnabled.class)
@@ -481,8 +539,8 @@ public class ResteasyReactiveJacksonProcessor {
             }
 
             var methodReturnType = methodInfo.returnType();
-            ClassInfo effectiveReturnClassInfo = getEffectiveClassInfo(methodReturnType, indexView);
-            if (effectiveReturnClassInfo == null) {
+            ClassInfo serializedClassInfo = getSerializedClassInfo(methodReturnType, indexView);
+            if (serializedClassInfo == null) {
                 continue;
             }
 
@@ -491,8 +549,8 @@ public class ResteasyReactiveJacksonProcessor {
                 typeParamIdentifierToParameterizedType = new HashMap<>();
                 var parametrizedReturnType = methodReturnType.asParameterizedType();
                 for (int i = 0; i < parametrizedReturnType.arguments().size(); i++) {
-                    if (i < effectiveReturnClassInfo.typeParameters().size()) {
-                        var identifier = effectiveReturnClassInfo.typeParameters().get(i).identifier();
+                    if (i < serializedClassInfo.typeParameters().size()) {
+                        var identifier = serializedClassInfo.typeParameters().get(i).identifier();
                         var parametrizedTypeArg = parametrizedReturnType.arguments().get(i);
                         typeParamIdentifierToParameterizedType.put(identifier, parametrizedTypeArg);
                     }
@@ -503,7 +561,7 @@ public class ResteasyReactiveJacksonProcessor {
 
             AtomicBoolean needToDeleteCache = new AtomicBoolean(false);
             if (secureSerializationExplicitlyEnabled
-                    || hasSecureFields(indexView, effectiveReturnClassInfo, typeToHasSecureField, needToDeleteCache,
+                    || hasSecureFields(indexView, serializedClassInfo, typeToHasSecureField, needToDeleteCache,
                             typeParamIdentifierToParameterizedType)) {
                 AnnotationInstance customSerializationAtClassAnnotation = methodInfo.declaringClass()
                         .declaredAnnotation(CUSTOM_SERIALIZATION);
@@ -528,36 +586,51 @@ public class ResteasyReactiveJacksonProcessor {
         }
     }
 
-    private static ClassInfo getEffectiveClassInfo(Type type, IndexView indexView) {
+    private static ClassInfo getSerializedClassInfo(Type type, IndexView indexView) {
         if (type.kind() == Type.Kind.VOID) {
             return null;
         }
-        Type effectiveReturnType = getEffectiveType(type);
+        Type effectiveReturnType = getSerializedType(type);
         return effectiveReturnType == null ? null : indexView.getClassByName(effectiveReturnType.name());
     }
 
-    private static Type getEffectiveType(Type type) {
+    private static Type getSerializedType(Type type) {
+        // First unwrap async wrappers (Uni, CompletionStage, Multi, RestResponse, etc.)
         Type effectiveReturnType = type;
-        if (effectiveReturnType.name().equals(ResteasyReactiveDotNames.REST_RESPONSE) ||
-                effectiveReturnType.name().equals(ResteasyReactiveDotNames.UNI) ||
-                effectiveReturnType.name().equals(ResteasyReactiveDotNames.COMPLETABLE_FUTURE) ||
-                effectiveReturnType.name().equals(ResteasyReactiveDotNames.COMPLETION_STAGE) ||
-                effectiveReturnType.name().equals(ResteasyReactiveDotNames.REST_MULTI) ||
-                effectiveReturnType.name().equals(ResteasyReactiveDotNames.MULTI)) {
-            if (effectiveReturnType.kind() != Type.Kind.PARAMETERIZED_TYPE) {
-                return null;
+        while (true) {
+            var preType = effectiveReturnType;
+            effectiveReturnType = EndpointIndexer.getNonWrapperReturnType(type);
+            if (preType.equals(effectiveReturnType)) {
+                break;
             }
-
-            effectiveReturnType = type.asParameterizedType().arguments().get(0);
+            // do another loop to see if we have another type to handle
         }
-        if (effectiveReturnType.name().equals(ResteasyReactiveDotNames.SET) ||
-                effectiveReturnType.name().equals(ResteasyReactiveDotNames.COLLECTION) ||
-                effectiveReturnType.name().equals(ResteasyReactiveDotNames.LIST)) {
-            effectiveReturnType = effectiveReturnType.asParameterizedType().arguments().get(0);
-        } else if (effectiveReturnType.name().equals(ResteasyReactiveDotNames.MAP)) {
-            effectiveReturnType = effectiveReturnType.asParameterizedType().arguments().get(1);
+        // Then unwrap collection/map types to get the element type
+        while (true) {
+            var preType = effectiveReturnType;
+            effectiveReturnType = getCollectionElementType(effectiveReturnType);
+            if (preType.equals(effectiveReturnType)) {
+                break;
+            }
+            // do another loop to see if we have another type to handle
         }
         return effectiveReturnType;
+    }
+
+    private static Type getCollectionElementType(Type type) {
+        if (type.kind() != Type.Kind.PARAMETERIZED_TYPE) {
+            return type;
+        }
+        ParameterizedType parameterizedType = type.asParameterizedType();
+        DotName name = type.name();
+        if (name.equals(ResteasyReactiveDotNames.SET) ||
+                name.equals(ResteasyReactiveDotNames.COLLECTION) ||
+                name.equals(ResteasyReactiveDotNames.LIST)) {
+            return parameterizedType.arguments().get(0);
+        } else if (name.equals(ResteasyReactiveDotNames.MAP)) {
+            return parameterizedType.asParameterizedType().arguments().get(1);
+        }
+        return type;
     }
 
     private static Map<String, Boolean> getTypesWithSecureField() {

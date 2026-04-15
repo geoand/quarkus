@@ -35,6 +35,7 @@ public class SimpleJsonTest extends AbstractSimpleJsonTest {
                                     "user-expression=user\n" +
                                     "birth-date-roles=alice,bob\n" +
                                     "quarkus.jackson.fail-on-unknown-properties=true\n" +
+                                    "quarkus.jackson.build-time-introspection=true\n" +
                                     "quarkus.rest.jackson.optimization.enable-reflection-free-serializers=false\n"),
                                     "application.properties");
                 }

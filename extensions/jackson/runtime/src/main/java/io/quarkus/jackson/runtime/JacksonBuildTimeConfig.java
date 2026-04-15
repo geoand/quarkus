@@ -2,6 +2,7 @@ package io.quarkus.jackson.runtime;
 
 import java.time.ZoneId;
 import java.util.Optional;
+import java.util.function.BooleanSupplier;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 
@@ -72,4 +73,24 @@ public interface JacksonBuildTimeConfig {
      * subclass.
      */
     Optional<String> propertyNamingStrategy();
+
+    /**
+     * If enabled, Jackson class introspection metadata (properties, creators, annotations)
+     * is precomputed at build time using Jandex, bypassing Jackson's runtime reflection-based
+     * class introspection.
+     * <p>
+     * This can improve startup time and reduce reflection usage, but may not support all
+     * Jackson features.
+     */
+    @WithDefault("false")
+    boolean buildTimeIntrospection();
+
+    class IsBuildTimeIntrospectionEnabled implements BooleanSupplier {
+        JacksonBuildTimeConfig config;
+
+        @Override
+        public boolean getAsBoolean() {
+            return config.buildTimeIntrospection();
+        }
+    }
 }
